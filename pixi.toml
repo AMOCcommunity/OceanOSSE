@@ -1,0 +1,79 @@
+[workspace]
+authors = ["Ollie Tooth <oliver.tooth@noc.ac.uk>", "Adam Blaker <atb299@noc.ac.uk>"]
+preview = ["pixi-build"]
+channels = ["conda-forge", "nodefaults"]
+platforms = ["win-64", "linux-64", "osx-arm64"]
+
+# === Package Metadata === #
+
+[package]
+name = "OceanOSSE"
+version = "9999.0.0"
+
+[package.build]
+backend = { name = "pixi-build-python", version = ">=0.4.4" }
+
+[package.host-dependencies]
+setuptools = "*"
+setuptools_scm = "*"
+
+# === Core Dependencies === #
+
+[package.run-dependencies]
+python = "*"
+dask = "*"
+gsw = "*"
+netCDF4 = "*"
+xarray = "*"
+zarr = "*"
+git = "*" # needed for dynamic versioning
+
+[dependencies]
+# Define OceanOSSE package as local path dependency:
+OceanOSSE = { path = "." }
+python = "3.13.*"
+
+# === Features === #
+
+[feature.dev.dependencies]
+# Additional dependencies for OceanOSSE development environment:
+notebook = "*"
+ipykernel = "*"
+matplotlib = "*"
+cartopy = "*"
+nc-time-axis = "*"
+
+[feature.dev.pypi-dependencies]
+ruff = "*"
+pytest = "*"
+pytest-mock = "*"
+
+[feature.docs.pypi-dependencies]
+# Additional dependencies for OceanOSSE documentation environment:
+zensical = "*"
+mkdocstrings = "*"
+mkdocstrings-python = "*"
+
+[feature.release.pypi-dependencies]
+# Additional dependencies for OceanOSSE release environment:
+build = "*"
+twine = "*"
+
+# === Tasks === #
+
+[feature.dev.tasks]
+tests = { cmd = "pytest --maxfail=1 --tb=short", description = "Run OceanOSSE unit tests using pytest." }
+lint = { cmd = "ruff check OceanOSSE/ tests/", description = "Run code linting using Ruff." }
+fix = { cmd = "ruff check OceanOSSE/ tests/ --fix", description = "Run code linting and auto-fix issues using Ruff." }
+format = { cmd = "ruff format OceanOSSE/ tests/", description = "Run code formatting using Ruff." }
+
+[feature.docs.tasks]
+preview-docs = { cmd = "cd docs/; zensical serve", description = "Run local preview of OceanOSSE Documentation." }
+
+# === Environments === #
+
+[environments]
+default = { solve-group = "default" }
+dev = { features = ["dev"], solve-group = "default" }
+docs = { features = ["docs"], solve-group = "default" }
+release = { features = ["release"], solve-group = "default" }

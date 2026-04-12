@@ -1,0 +1,38 @@
+name: tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    name: Run OceanOSSE Unit Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+
+    steps:
+      - name: 🧾 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 📦 Install dependencies using Pixi
+        uses: prefix-dev/setup-pixi@v0.9.5
+        with:
+          # Pin setup-pixi to a specific version to avoid breaking changes.
+          # TODO -> Use Dependabot (see .github/dependabot.yml) to keep this up to date.
+          pixi-version: v0.46.0
+          # Caching disabled without pixi.lock files.
+          cache: false
+
+      - name: 🧪 Run OceanOSSE Unit Tests
+        run: pixi run tests

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: ❓ Usage Question
+    url: https://github.com/AMOCcommunity/OceanOSSE/discussions
+    about: |
+      Ask questions and share ideas with other OceanOSSE community members here.
+      If you have a question like "How do I create a new Observational Sampler?" then
+      please include a self-contained, reproducible example if possible.

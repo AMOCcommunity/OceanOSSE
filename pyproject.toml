@@ -30,6 +30,14 @@ dependencies = [
   "zarr>=3.0.7",
   ]
 
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "pytest-mock",
+  "pytest-cov",
+  "ruff",
+  ]
+
 [project.urls]
 Repository = "https://github.com/AMOCcommunity/OceanOSSE"
 Documentation = "https://amoccommunity.github.io/OceanOSSE/"

@@ -1,0 +1,56 @@
+[project]
+name = "OceanOSSE"
+description = "Python toolbox for performing Observing System Simulation Experiments (OSSEs) in ocean general circulation models."
+keywords = ["oceanography", "modelling", "observations", "OSSE"]
+classifiers = [
+  "Operating System :: OS Independent",
+  "Intended Audience :: Science/Research",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering",
+]
+dynamic = ["version"]
+authors = [{email = "oliver.tooth@noc.ac.uk"},{name = "Ollie Tooth"}]
+maintainers = [{name = "Ollie Tooth", email = "oliver.tooth@noc.ac.uk"}]
+license = "Apache-2.0"
+readme = "README.md"
+requires-python = ">=3.12"
+
+dependencies = [
+  "dask>=2025.7.0",
+  "flox>=0.10.6",
+  "gsw>=3.6.20",
+  "numbagg>=0.8",
+  "numba>=0.62",
+  "numpy>=2.3",    # numba 0.62 added support for numpy 2.3
+  "netCDF4<=1.7.3",
+  "xarray>=2025.07.1",
+  "zarr>=3.0.7",
+  ]
+
+[project.urls]
+Repository = "https://github.com/AMOCcommunity/OceanOSSE"
+Documentation = "https://amoccommunity.github.io/OceanOSSE/"
+
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = ["setuptools>=77.0.3", "setuptools-scm>=8"]
+
+[tool.setuptools.packages.find]
+include = ["OceanOSSE*"]
+
+[tool.setuptools_scm]
+fallback_version = "9999"
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"

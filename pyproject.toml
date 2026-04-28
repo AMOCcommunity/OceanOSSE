@@ -19,15 +19,13 @@ readme = "README.md"
 requires-python = ">=3.12"
 
 dependencies = [
-  "dask>=2025.7.0",
-  "flox>=0.10.6",
-  "gsw>=3.6.20",
-  "numbagg>=0.8",
-  "numba>=0.62",
-  "numpy>=2.3",    # numba 0.62 added support for numpy 2.3
-  "netCDF4<=1.7.3",
-  "xarray>=2025.07.1",
-  "zarr>=3.0.7",
+  "cftime",
+  "dask",
+  "netcdf4",
+  "pydantic",
+  "typer",
+  "xarray",
+  "zarr",
   ]
 
 [project.optional-dependencies]
@@ -62,3 +60,6 @@ ignore = ["E501"]
 
 [tool.ruff.format]
 quote-style = "double"
+
+[project.scripts]
+OceanOSSE = "OceanOSSE.cli:app"

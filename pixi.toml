@@ -24,6 +24,7 @@ python = "*"
 dask = "*"
 gsw = "*"
 netCDF4 = "*"
+typer = ">=0.24.1,<0.25"
 xarray = "*"
 zarr = "*"
 git = "*" # needed for dynamic versioning
@@ -32,6 +33,7 @@ git = "*" # needed for dynamic versioning
 # Define OceanOSSE package as local path dependency:
 OceanOSSE = { path = "." }
 python = "3.13.*"
+pydantic = ">=2.13.3,<3"
 
 # === Features === #
 
@@ -42,6 +44,7 @@ ipykernel = "*"
 matplotlib = "*"
 cartopy = "*"
 nc-time-axis = "*"
+polars = ">=1.39.3,<2"
 
 [feature.dev.pypi-dependencies]
 ruff = "*"

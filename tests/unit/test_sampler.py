@@ -104,7 +104,6 @@ def test_sampler_nn():
    
     sampler = NNSampler()
     model_t = sampler.sample(ds, profile)
-    print(model_t)
     
     assert ((model_t.votemper.isel(profile_id=0) == ds.votemper[:, 6, 4]).all() 
             & (model_t.votemper.isel(profile_id=1) == ds.votemper[:, 2, 1]).all())

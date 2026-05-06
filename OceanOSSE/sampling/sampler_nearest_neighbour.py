@@ -167,7 +167,6 @@ class NNSampler(ObsSampler):
         nearest = stacked.argsort(axis=-1)
         ji = stacked.gridpoint.isel(gridpoint=nearest.isel(gridpoint=0))
 
-        # TODO use great circle distance on the 4 nearest points
         i_nn = ji["i"]
         j_nn = ji["j"]
         i_nn = i_nn.drop_vars("gridpoint")

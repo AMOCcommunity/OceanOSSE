@@ -124,6 +124,7 @@ class NNSampler(ObsSampler):
         ----------
         ds : xarray.Dataset
             Gridded ocean model dataset.
+        profile : xarray.Dataset observation profile dataset
 
         Returns
         -------
@@ -150,8 +151,7 @@ class NNSampler(ObsSampler):
         ----------
         ds : xarray.Dataset
             Gridded ocean model dataset.
-        profile_lon : observation longitude
-        profile_lat : observation latitude
+        profile : xarray.Dataset observation profile dataset
 
         Return
         index: indicies of model in i an j

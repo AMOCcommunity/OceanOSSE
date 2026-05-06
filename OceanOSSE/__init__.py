@@ -15,6 +15,7 @@ from OceanOSSE.gridding.regridder import Regridder
 from OceanOSSE.io.dataloader import DataLoader
 from OceanOSSE.io.datawriter import DataWriter
 from OceanOSSE.sampling.sampler import ErrorKernel, ObsSampler
+from OceanOSSE.sampling.sampler_nearest_neighbour import NNSampler
 
 try:
     __version__ = _version("OceanOSSE")

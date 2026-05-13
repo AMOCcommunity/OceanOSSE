@@ -37,10 +37,12 @@ def test_sampler():
     prof_id = np.array([0])
     profile_lon = np.array([3])
     profile_lat = np.array([5])
+    profile_time = np.array([dt.datetime(2020, 5, 4)])
     profile = xr.Dataset(
         {
-            "lon": (("prof_id"), profile_lon),
-            "lat": (("prof_id"), profile_lat)
+            "lon": (("profile_id"), profile_lon),
+            "lat": (("profile_id"), profile_lat),
+            "time": (("profile_id"), profile_time)
         },
         coords={
             "profile_id": prof_id,
@@ -64,10 +66,12 @@ def test_sampler_multi():
     prof_id = np.array([0, 1])
     profile_lon = np.array([3, 8])
     profile_lat = np.array([5, 6])
+    profile_time = np.array([dt.datetime(2020, 5, 4), dt.datetime(2020, 8, 23)])
     profile = xr.Dataset(
         {
             "lon": (("profile_id"), profile_lon),
-            "lat": (("profile_id"), profile_lat)
+            "lat": (("profile_id"), profile_lat),
+            "time": (("profile_id"), profile_time)
         },
         coords={
             "profile_id": prof_id,
@@ -92,10 +96,12 @@ def test_sampler_nn():
     prof_id = np.array([0, 1])
     profile_lon = np.array([3.5, 1.2])
     profile_lat = np.array([5.5, 2.2])
+    profile_time = np.array([dt.datetime(2020, 5, 4), dt.datetime(2020, 8, 23)])
     profile = xr.Dataset(
         {
             "lon": (("profile_id"), profile_lon),
-            "lat": (("profile_id"), profile_lat)
+            "lat": (("profile_id"), profile_lat),
+            "time": (("profile_id"), profile_time)
         },
         coords={
             "profile_id": prof_id,
@@ -116,12 +122,15 @@ def construct_ds():
     lat = np.arange(0, 8)
     lon = np.arange(0, 10)
     depth = np.arange(0, 150, 10)
+    st_date = dt.datetime(2020, 5, 1)
+    num_days = 730
+    model_dates = np.array([st_date + dt.timedelta(days=x) for x in range(num_days)])
+    model_day = np.array([x for x in range(num_days)])
     
-    # Broadcast to 3D (depth, lat, lon)
-    d, y, x = np.meshgrid(depth, lat, lon, indexing='ij')
-    
-    # Synthetic temperature field
-    votemper =  15 - (y * 0.4) + (x * 0.2) - (d * 0.02)
+    # Broadcast to 4D (time, depth, lat, lon)
+    t, d, y, x = np.meshgrid(model_day, depth, lat, lon, indexing='ij')
+
+    votemper = 15 - (y * 0.4) + (x * 0.2) - (d * 0.2) + (t * 0.000005)
     
     # Build dataset
     ds = xr.Dataset(
@@ -129,12 +138,14 @@ def construct_ds():
             "votemper": (("d", "j", "i"), votemper),
             "lat": (("j", "i"), y[0, :, :]),
             "lon": (("j", "i"), x[0, :, :]),
-            "depth": (("d", "j", "i"), d)
+            "depth": (("d", "j", "i"), d),
+            "time": (("t"), t[:, 0, 0, 0])
         },
         coords={
             "d": depth,
             "j": lat,
             "i": lon,
+            "t": model_dates
         },
     )
     

@@ -67,12 +67,13 @@ def test_regrid():
     Test replacing profiles in climatology with model data.
     """
     ds = construct_ds()
+    synth_profiles = construct_profile_ds()
     
     regrid_data = SwapRegridder(ds)
     ds_model = regrid_data.regrid(synth_profiles)
-    
-    
-    assert False
+
+    assert ((ds_model != regrid_data.ds_clim) 
+            & (ds_model.isel(i=3, j=5, t=31) == synth_profiles.isel(profile_id=0)))
     
     
 def construct_ds():
@@ -109,4 +110,42 @@ def construct_ds():
         },
     )
     
+    return ds
+
+
+def construct_profile_ds():
+    d = np.arange(0, 150, 10)
+    profile_id = np.arange(2)
+
+    j = np.array([5, 6])
+    i = np.array([3, 8])
+
+    depth = np.tile(d[:, None], (1, profile_id.size))
+
+    # Time coordinate
+    st_date = dt.datetime(2020, 5, 1)
+    time = np.array([
+        dt.datetime(2020, 6, 1),
+        dt.datetime(2020, 7, 2),
+    ])
+    time_day = np.array([(x - st_date).days for x in time])
+    
+    votemper = 15 - depth * 0.02 - j[None, :] * 0.2 + i[None, :] * 0.1 + (time_day * 0.000005)
+
+    ds = xr.Dataset(
+        data_vars={
+            "votemper": (("d", "profile_id"), votemper),
+            "lat": (("profile_id",), j),
+            "lon": (("profile_id",), i),
+            "depth": (("d", "profile_id"), depth),
+        },
+        coords={
+            "d": d,
+            "profile_id": profile_id,
+            "t": (("profile_id",), time),
+            "j": (("profile_id",), j),
+            "i": (("profile_id",), i),
+        },
+    )
+
     return ds

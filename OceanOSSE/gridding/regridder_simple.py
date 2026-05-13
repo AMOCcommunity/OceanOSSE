@@ -95,7 +95,8 @@ class SwapRegridder(Regridder):
         """
         # Use indices in synthetic profile set to replace data in the climatology with model data
         ds_model = self._climatology()
-        
+
+            
         return ds_model
     
     def _climatology(self):
@@ -108,19 +109,17 @@ class SwapRegridder(Regridder):
             Dataset of monthly means.
         """
         ds = self._target_grid.assign_coords(
-            dayofyear=("t", self._target_grid.t.dt.dayofyear.data)
+            monthday=("t", self._target_grid.t.dt.strftime("%m-%d").data)
         )
         # calculate climatology
-        ds_clim = ds.groupby('dayofyear').mean()
+        ds_clim = ds.groupby('monthday').mean()
         
         # tile the climatology data back over full time series
-        ds_clim_full = ds_clim.sel(dayofyear=ds.dayofyear)
+        ds_clim_full = ds_clim.sel(monthday=ds.monthday)
         
         # Remove not needed time dim from variables
         for v in ["lat", "lon", "depth"]:
             ds_clim_full[v] = ds_clim_full[v].isel(t=0, drop=True)
-
-        print(ds_clim_full)
-        
+       
         return ds_clim_full
     

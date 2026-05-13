@@ -98,13 +98,23 @@ class SwapRegridder(Regridder):
         n_profile = len(ds.coords['profile_id'])
         
         # loop over profiles
-        for i in range(n_profile):
-            i_ind = ds.coords['i'][i]
-            i_ind = ds.coords['i'][i]
-            prof_select = ds.coords['profile_id'][i]
-            ds_model.iloc[{'i': i_ind, 'j': j_ind}] = ds.iloc[{'profile_id': prof_select}]
+        for p in range(n_profile):
+            i_ind = ds.coords['i'][p].to_numpy()
+            j_ind = ds.coords['j'][p].to_numpy()
+            t_ind = ds.coords['t'][p].to_numpy()
+            ps = ds.coords['profile_id'][p].to_numpy()
+
+            profile = ds['votemper'].isel(profile_id=ps)
+            
+            ds_model['votemper'].loc[
+                dict(
+                    t=ds.t.sel(profile_id=ps),
+                    j=ds.j.sel(profile_id=ps),
+                    i=ds.i.sel(profile_id=ps))
+                ] = profile.values
             
         return ds_model
+    
     
     def climatology(self):
         """
@@ -127,6 +137,7 @@ class SwapRegridder(Regridder):
         # Remove not needed time dim from variables
         for v in ["lat", "lon", "depth"]:
             ds_clim_full[v] = ds_clim_full[v].isel(t=0, drop=True)
-       
+        ds_clim_full = ds_clim_full.drop_vars('monthday')
+        
         return ds_clim_full
     

@@ -25,9 +25,7 @@ import pytest
 import datetime as dt
 import numpy as np
 import xarray as xr
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
+
 from OceanOSSE.gridding.regridder_simple import SwapRegridder
 
 
@@ -42,14 +40,7 @@ def test_climatology():
     
     ts = ds.votemper.mean(dim=["d", "j", "i"])
     clim_mean = clim.votemper.mean(dim=["d", "j", "i"])
-    
-    if 0:
-        ts.plot(label="Original")
-        clim_mean.plot(label="Climatology")
-
-        plt.legend()
-        plt.savefig("temp_timeseries.png")
-    
+        
     st_date = dt.datetime(2020, 5, 1)
     test_sec1 = (dt.datetime(2020, 5, 30) - st_date).days
     test_sec2 = (dt.datetime(2021, 5, 30) - st_date).days

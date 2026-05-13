@@ -40,20 +40,27 @@ def test_climatology():
     regrid = SwapRegridder(ds)
     clim = regrid._climatology()
     
-    if 1:
-        ts = ds.votemper.mean(dim=["d", "j", "i"])
-        clim = clim.votemper.mean(dim=["d", "j", "i"])
-        print(ts)
-
+    ts = ds.votemper.mean(dim=["d", "j", "i"])
+    clim_mean = clim.votemper.mean(dim=["d", "j", "i"])
+    
+    if 0:
         ts.plot(label="Original")
-        clim.plot(label="Climatology")
+        clim_mean.plot(label="Climatology")
 
         plt.legend()
-        plt.show()
         plt.savefig("temp_timeseries.png")
     
-    #assert (model_t.votemper.to_numpy().squeeze() == ds.votemper[:, 5, 3]).all()
-    assert False
+    st_date = dt.datetime(2020, 5, 1)
+    test_sec1 = (dt.datetime(2020, 5, 30) - st_date).days
+    test_sec2 = (dt.datetime(2021, 5, 30) - st_date).days
+    test_temp1 = 15 - (0 * 0.4) + (0 * 0.2) - (0 * 0.2) + (test_sec1 * 0.000005)
+    test_temp2 = 15 - (0 * 0.4) + (0 * 0.2) - (0 * 0.2) + (test_sec2 * 0.000005)
+    test_temp = (test_temp1 + test_temp2) / 2
+    clim_day = clim.votemper.sel(t='2020-05-30').isel(d=0, j=0, i=0)
+    
+    assert (np.isclose(ts.mean().to_numpy(), clim_mean.mean().to_numpy(), atol=1e8)
+             & (clim_day.to_numpy() == test_temp))
+
     
 def construct_ds():
     """
@@ -65,10 +72,10 @@ def construct_ds():
     st_date = dt.datetime(2020, 5, 1)
     num_days = 730
     model_dates = np.array([st_date + dt.timedelta(days=x) for x in range(num_days)])
-    model_sec = np.array([x for x in range(num_days)])
+    model_day = np.array([x for x in range(num_days)])
     
     # Broadcast to 4D (time, depth, lat, lon)
-    t, d, y, x = np.meshgrid(model_sec, depth, lat, lon, indexing='ij')
+    t, d, y, x = np.meshgrid(model_day, depth, lat, lon, indexing='ij')
 
     votemper = 15 - (y * 0.4) + (x * 0.2) - (d * 0.2) + (t * 0.000005)
         

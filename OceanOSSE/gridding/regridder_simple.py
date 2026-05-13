@@ -95,7 +95,14 @@ class SwapRegridder(Regridder):
         """
         # Use indices in synthetic profile set to replace data in the climatology with model data
         ds_model = self.ds_clim
-
+        n_profile = len(ds.coords['profile_id'])
+        
+        # loop over profiles
+        for i in range(n_profile):
+            i_ind = ds.coords['i'][i]
+            i_ind = ds.coords['i'][i]
+            prof_select = ds.coords['profile_id'][i]
+            ds_model.iloc[{'i': i_ind, 'j': j_ind}] = ds.iloc[{'profile_id': prof_select}]
             
         return ds_model
     

@@ -52,7 +52,7 @@ class SwapRegridder(Regridder):
         if target_grid is not None and not isinstance(target_grid, xr.Dataset):
             raise TypeError("``target_grid`` must be an xarray.Dataset or None.")
         self._target_grid = target_grid
-        
+        self.ds_clim = self.climatology()
 
     def __repr__(self) -> str:
         has_grid = self._target_grid is not None
@@ -81,7 +81,7 @@ class SwapRegridder(Regridder):
     
     def regrid(self, ds: xr.Dataset) -> xr.Dataset:
         """
-        Regrid the synthetic observation dataset onto the target grid.
+        Regrid the synthetic observation dataset into the target grid.
 
         Parameters
         ----------
@@ -91,15 +91,15 @@ class SwapRegridder(Regridder):
         Returns
         -------
         xarray.Dataset
-            Dataset of synthetic observations regridded onto target grid.
+            Dataset of synthetic observations placed into target grid.
         """
         # Use indices in synthetic profile set to replace data in the climatology with model data
-        ds_model = self._climatology()
+        ds_model = self.ds_clim
 
             
         return ds_model
     
-    def _climatology(self):
+    def climatology(self):
         """
         Calculate the climatology of the target grid.
         

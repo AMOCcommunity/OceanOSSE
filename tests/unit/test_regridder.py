@@ -38,7 +38,7 @@ def test_climatology():
     ds = construct_ds()
     
     regrid = SwapRegridder(ds)
-    clim = regrid._climatology()
+    clim = regrid.ds_clim
     
     ts = ds.votemper.mean(dim=["d", "j", "i"])
     clim_mean = clim.votemper.mean(dim=["d", "j", "i"])
@@ -61,6 +61,10 @@ def test_climatology():
     assert (np.isclose(ts.mean().to_numpy(), clim_mean.mean().to_numpy(), atol=1e8)
              & (clim_day.to_numpy() == test_temp))
 
+    
+def test_regrid():
+    ...
+    
     
 def construct_ds():
     """

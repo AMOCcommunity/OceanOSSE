@@ -63,7 +63,16 @@ def test_climatology():
 
     
 def test_regrid():
-    ...
+    """
+    Test replacing profiles in climatology with model data.
+    """
+    ds = construct_ds()
+    
+    regrid_data = SwapRegridder(ds)
+    ds_model = regrid_data.regrid(synth_profiles)
+    
+    
+    assert False
     
     
 def construct_ds():

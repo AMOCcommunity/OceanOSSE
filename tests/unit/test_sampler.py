@@ -144,6 +144,37 @@ def test_sampler_time():
     
     assert (model_t.votemper.to_numpy().squeeze() == ds.votemper[5, :, 5, 3]).all()
     
+    
+def test_sampler_time_out_bounds():
+    """
+    Tests for extracting a profile that falls on a model grid point but 
+    inbetween two time steps.
+    """
+    # Build dataset
+    ds = construct_ds()
+
+    # Synthetic profile
+    prof_id = np.array([0])
+    profile_lon = np.array([3])
+    profile_lat = np.array([5])
+    profile_time = np.array([dt.datetime(2021, 5, 1)])
+    profile = xr.Dataset(
+        {
+            "lon": (("profile_id"), profile_lon),
+            "lat": (("profile_id"), profile_lat),
+            "time": (("profile_id"), profile_time)
+        },
+        coords={
+            "profile_id": prof_id,
+        },
+    )
+
+    sampler = NNSampler()
+    with pytest.raises(ValueError, match=r"Profile time.*") as exc_info:
+        model_t = sampler.sample(ds, profile)
+    
+    assert exc_info.type is ValueError
+    
 
 def construct_ds():
     """

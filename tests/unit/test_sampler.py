@@ -52,7 +52,7 @@ def test_sampler():
     sampler = NNSampler()
     model_t = sampler.sample(ds, profile)
     
-    assert (model_t.votemper.to_numpy().squeeze() == ds.votemper[:, 5, 3]).all()
+    assert (model_t.votemper.to_numpy().squeeze() == ds.votemper[3, :, 5, 3]).all()
     
     
 def test_sampler_multi():
@@ -81,7 +81,7 @@ def test_sampler_multi():
     sampler = NNSampler()
     model_t = sampler.sample(ds, profile)
     
-    assert (model_t.votemper.isel(profile_id=1) == ds.votemper[:, 6, 8]).all()
+    assert (model_t.votemper.isel(profile_id=1) == ds.votemper[114, :, 6, 8]).all()
     
     
 def test_sampler_nn():
@@ -111,8 +111,38 @@ def test_sampler_nn():
     sampler = NNSampler()
     model_t = sampler.sample(ds, profile)
     
-    assert ((model_t.votemper.isel(profile_id=0) == ds.votemper[:, 6, 4]).all() 
-            & (model_t.votemper.isel(profile_id=1) == ds.votemper[:, 2, 1]).all())
+    assert ((model_t.votemper.isel(profile_id=0) == ds.votemper[3, :, 6, 4]).all() 
+            & (model_t.votemper.isel(profile_id=1) == ds.votemper[114, :, 2, 1]).all())
+    
+    
+def test_sampler_time():
+    """
+    Tests for extracting a profile that falls on a model grid point but 
+    inbetween two time steps.
+    """
+    # Build dataset
+    ds = construct_ds()
+
+    # Synthetic profile
+    prof_id = np.array([0])
+    profile_lon = np.array([3])
+    profile_lat = np.array([5])
+    profile_time = np.array([dt.datetime(2020, 5, 6, 12)])
+    profile = xr.Dataset(
+        {
+            "lon": (("profile_id"), profile_lon),
+            "lat": (("profile_id"), profile_lat),
+            "time": (("profile_id"), profile_time)
+        },
+        coords={
+            "profile_id": prof_id,
+        },
+    )
+
+    sampler = NNSampler()
+    model_t = sampler.sample(ds, profile)
+    
+    assert (model_t.votemper.to_numpy().squeeze() == ds.votemper[5, :, 5, 3]).all()
     
 
 def construct_ds():
@@ -123,7 +153,7 @@ def construct_ds():
     lon = np.arange(0, 10)
     depth = np.arange(0, 150, 10)
     st_date = dt.datetime(2020, 5, 1)
-    num_days = 730
+    num_days = 180
     model_dates = np.array([st_date + dt.timedelta(days=x) for x in range(num_days)])
     model_day = np.array([x for x in range(num_days)])
     
@@ -135,17 +165,17 @@ def construct_ds():
     # Build dataset
     ds = xr.Dataset(
         {
-            "votemper": (("d", "j", "i"), votemper),
-            "lat": (("j", "i"), y[0, :, :]),
-            "lon": (("j", "i"), x[0, :, :]),
-            "depth": (("d", "j", "i"), d),
-            "time": (("t"), t[:, 0, 0, 0])
+            "votemper": (("t", "d", "j", "i"), votemper),
+            "lat": (("j", "i"), y[0, 0, :, :]),
+            "lon": (("j", "i"), x[0, 0, :, :]),
+            "depth": (("d", "j", "i"), d[0, :, :, :]),
+            "time": (("t"), model_dates)
         },
         coords={
             "d": depth,
             "j": lat,
             "i": lon,
-            "t": model_dates
+            "t": model_day
         },
     )
     

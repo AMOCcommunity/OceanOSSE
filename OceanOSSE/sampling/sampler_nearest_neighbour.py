@@ -166,11 +166,14 @@ class NNSampler(ObsSampler):
         
         # Tiny tie-break penalties to sort dist, j , i
         # Gives consitent results and 0.5 rounds up
-        score = (
-            dist
-            - 1e-6 * dist["j"]
-            - 1e-9 * dist["i"]
-            )
+        if (dist.min("gridpoint") == 0.5).any():
+            score = (
+                dist
+                - 1e-6 * dist["j"]
+                - 1e-9 * dist["i"]
+                )
+        else:
+            score = dist
         
         # Find nearest
         nearest = score.argmin("gridpoint")

@@ -85,8 +85,9 @@ class NNSampler(ObsSampler):
             Sampled synthetic observations dataset.
         """
         i_nn, j_nn = self.find_nearest_ij(ds, profile)
+        t_nn = self.find_nearest_time(ds, profile)
         
-        ds_synth = self.extract_locations(ds, i_nn, j_nn)
+        ds_synth = self.extract_locations(ds, i_nn, j_nn, t_nn)
         
         return ds_synth
     
@@ -160,6 +161,7 @@ class NNSampler(ObsSampler):
         lon_sub = np.abs(ds.lon - profile.lon)
         lat_sub = np.abs(ds.lat - profile.lat)
         dist = ((lon_sub + lat_sub) / 2)
+        # Stack along new gridpoint dimension
         dist = dist.stack(gridpoint=("j", "i"))
         
         # Tiny tie-break penalties to sort dist, j , i
@@ -170,6 +172,7 @@ class NNSampler(ObsSampler):
             - 1e-9 * dist["i"]
             )
         
+        # Find nearest
         nearest = score.argmin("gridpoint")
         ji = score["gridpoint"].isel(gridpoint=nearest)
 
@@ -179,9 +182,34 @@ class NNSampler(ObsSampler):
         j_nn = j_nn.drop_vars("gridpoint")
 
         return i_nn, j_nn
+
+    
+    def find_nearest_time(self, ds, profile):
+        """
+        Turn observation time into model time index
+
+        Parameters
+        ----------
+        ds : xarray.Dataset
+            Gridded ocean model dataset.
+        profile : xarray.Dataset observation profile dataset
+
+        Return
+        index: indicies of model in time
+        """
+        # Time difference in microsec
+        time_delta = np.abs(ds.time - profile.time)
+        
+        # Find nearest and take first occurance (i.e. round down)
+        nearest = time_delta.argmin("t")
+        t_near = time_delta.isel(t=nearest)
+
+        t_nn = t_near["t"]
+        
+        return t_nn
     
     
-    def extract_locations(self, ds, i_index, j_index):
+    def extract_locations(self, ds, i_index, j_index, t_index):
         """
         Extract a model profile at the specified model index.
 
@@ -197,7 +225,7 @@ class NNSampler(ObsSampler):
             Synthetic observations dataset
         """
 
-        ds_synth = ds.isel(i=i_index, j=j_index)
+        ds_synth = ds.isel(i=i_index, j=j_index, t=t_index)
         
         return ds_synth
         

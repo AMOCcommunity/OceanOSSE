@@ -152,7 +152,8 @@ class NNSampler(ObsSampler):
         ----------
         ds : xarray.Dataset
             Gridded ocean model dataset.
-        profile : xarray.Dataset observation profile dataset
+        profile : xarray.Dataset 
+            observation profile dataset
 
         Return
         index: indicies of model in i an j
@@ -187,7 +188,7 @@ class NNSampler(ObsSampler):
         return i_nn, j_nn
 
     
-    def find_nearest_time(self, ds, profile):
+    def find_nearest_time(self, ds, profile, thresh=10):
         """
         Turn observation time into model time index
 
@@ -195,21 +196,35 @@ class NNSampler(ObsSampler):
         ----------
         ds : xarray.Dataset
             Gridded ocean model dataset.
-        profile : xarray.Dataset observation profile dataset
+        profile : xarray.Dataset 
+            observation profile dataset
+        thresh : int 
+            threshold in model timesteps for a profile being out of time bounds
 
         Return
         index: indicies of model in time
         """
         # Time difference in microsec
         time_delta = np.abs(ds.time - profile.time)
-        
+
         # Find nearest and take first occurance (i.e. round down)
         nearest = time_delta.argmin("t")
         t_near = time_delta.isel(t=nearest)
 
         t_nn = t_near["t"]
         
-        return t_nn
+        n_profile = len(profile.coords['profile_id'])
+        flag = np.zeros((n_profile))
+        for p in range(n_profile):
+            ps = profile.coords['profile_id'][p].to_numpy()
+            if time_delta.isel(profile_id=ps).min() > ((ds.time.isel(t=1) - ds.time.isel(t=0)) * thresh):
+                flag[p] = 1
+                # I'm not sure what the best behaviour is for out of bounds profiles:
+                # raise error, return a flag that will skip the profile 
+                # or fill a blank profile
+                raise ValueError("Profile time is outside model time bounds.")
+        
+        return t_nn#, flag
     
     
     def extract_locations(self, ds, i_index, j_index, t_index):

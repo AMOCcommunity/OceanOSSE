@@ -84,6 +84,8 @@ class NNSampler(ObsSampler):
         xarray.Dataset
             Sampled synthetic observations dataset.
         """
+        profile = self.time_bounds(ds, profile)
+        
         i_nn, j_nn = self.find_nearest_ij(ds, profile)
         t_nn = self.find_nearest_time(ds, profile)
         
@@ -142,6 +144,39 @@ class NNSampler(ObsSampler):
         ds_obs = self.apply_errors(ds_sampled)
 
         return ds_obs
+    
+    
+    def time_bounds(self, ds, profile):
+        """
+        Remove profiles that are out of model bounds in time.
+        
+        Parameters
+        ----------
+        ds : xarray.Dataset
+            Gridded ocean model dataset.
+        profile : xarray.Dataset 
+            observation profile dataset
+
+        Return
+        profile : xarray.Dataset
+            observation profile dataset
+        """
+        st_date = ds.time.min(dim="t").to_numpy()
+        en_date = ds.time.max(dim="t").to_numpy()
+        p_time = profile.time.to_numpy()
+        
+        t_index = (p_time >= st_date) & (p_time <= en_date)
+        n_reject = np.sum(np.invert(t_index).astype(int))
+        n_total = profile.time.size
+        logging.info('Profiles rejected for being outside time bounds: {:.2f}'.format((n_reject / n_total) * 100))
+        print('Profiles rejected for being outside time bounds: {:.2f}%'.format((n_reject / n_total) * 100))
+        if n_reject / n_total == 1:
+            raise ValueError("All profiles outside model time bounds.")
+        
+        t_xa = xr.DataArray(t_index, coords={"profile_id": profile.coords['profile_id']})
+        profile = profile.where(t_xa, drop=True)
+
+        return profile
     
     
     def find_nearest_ij(self, ds, profile):
@@ -212,19 +247,15 @@ class NNSampler(ObsSampler):
         t_near = time_delta.isel(t=nearest)
 
         t_nn = t_near["t"]
-        
+
+        # Check for out of bounds
         n_profile = len(profile.coords['profile_id'])
-        flag = np.zeros((n_profile))
         for p in range(n_profile):
             ps = profile.coords['profile_id'][p].to_numpy()
-            if time_delta.isel(profile_id=ps).min() > ((ds.time.isel(t=1) - ds.time.isel(t=0)) * thresh):
-                flag[p] = 1
-                # I'm not sure what the best behaviour is for out of bounds profiles:
-                # raise error, return a flag that will skip the profile 
-                # or fill a blank profile
+            if time_delta.sel(profile_id=ps).min() > (ds.time.isel(t=1) - ds.time.isel(t=0)):
                 raise ValueError("Profile time is outside model time bounds.")
         
-        return t_nn#, flag
+        return t_nn
     
     
     def extract_locations(self, ds, i_index, j_index, t_index):

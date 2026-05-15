@@ -81,7 +81,7 @@ def test_sampler_multi():
     sampler = NNSampler()
     model_t = sampler.sample(ds, profile)
     
-    assert (model_t.votemper.isel(profile_id=1) == ds.votemper[114, :, 6, 8]).all()
+    assert (model_t.votemper.sel(profile_id=1) == ds.votemper[114, :, 6, 8]).all()
     
     
 def test_sampler_nn():
@@ -111,8 +111,8 @@ def test_sampler_nn():
     sampler = NNSampler()
     model_t = sampler.sample(ds, profile)
     
-    assert ((model_t.votemper.isel(profile_id=0) == ds.votemper[3, :, 6, 4]).all() 
-            & (model_t.votemper.isel(profile_id=1) == ds.votemper[114, :, 2, 1]).all())
+    assert ((model_t.votemper.sel(profile_id=0) == ds.votemper[3, :, 6, 4]).all() 
+            & (model_t.votemper.sel(profile_id=1) == ds.votemper[114, :, 2, 1]).all())
     
     
 def test_sampler_time():
@@ -147,8 +147,7 @@ def test_sampler_time():
     
 def test_sampler_time_out_bounds():
     """
-    Tests for extracting a profile that falls on a model grid point but 
-    inbetween two time steps.
+    Tests for extracting all profiles that are outside model time bounds.
     """
     # Build dataset
     ds = construct_ds()
@@ -170,11 +169,40 @@ def test_sampler_time_out_bounds():
     )
 
     sampler = NNSampler()
-    with pytest.raises(ValueError, match=r"Profile time.*") as exc_info:
+    with pytest.raises(ValueError, match=r".*time bounds.") as exc_info:
         model_t = sampler.sample(ds, profile)
     
     assert exc_info.type is ValueError
+
+
+def test_sampler_time_subset():
+    """
+    Tests for extracting profiles where some are outside model time bounds.
+    """
+    # Build dataset
+    ds = construct_ds()
+
+    # Synthetic profile
+    prof_id = np.array([0, 1])
+    profile_lon = np.array([3, 8])
+    profile_lat = np.array([5, 6])
+    profile_time = np.array([dt.datetime(2021, 5, 1), dt.datetime(2020, 5, 6)])
+    profile = xr.Dataset(
+        {
+            "lon": (("profile_id"), profile_lon),
+            "lat": (("profile_id"), profile_lat),
+            "time": (("profile_id"), profile_time)
+        },
+        coords={
+            "profile_id": prof_id,
+        },
+    )
+
+    sampler = NNSampler()
+    model_t = sampler.sample(ds, profile)
     
+    assert (model_t.votemper.sel(profile_id=1) == ds.votemper[5, :, 6, 8]).all()
+
 
 def construct_ds():
     """

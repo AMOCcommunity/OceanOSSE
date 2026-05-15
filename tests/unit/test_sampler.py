@@ -219,7 +219,7 @@ def construct_ds():
     # Broadcast to 4D (time, depth, lat, lon)
     t, d, y, x = np.meshgrid(model_day, depth, lat, lon, indexing='ij')
 
-    votemper = 15 - (y * 0.4) + (x * 0.2) - (d * 0.2) + (t * 0.000005)
+    votemper = 15 - (y * 0.4) + (x * 0.2) - (d * 0.05) + (t * 0.000005)
     
     # Build dataset
     ds = xr.Dataset(

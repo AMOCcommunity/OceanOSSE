@@ -41,7 +41,7 @@ def get_error_kernels(config: dict) -> list[ErrorKernel] | None:
     error_kernels_config = config["sampling"].get("error_kernels", None)
 
     if error_kernels_config is not None:
-        _ERROR_KERNEL_REGISTRY = {"test": TestErrorKernel}
+        _ERROR_KERNEL_REGISTRY = {"test": MockErrorKernel}
         kernels: list[ErrorKernel] = []
         for kernel_cfg in error_kernels_config:
             if ("module" in kernel_cfg) and ("name" in kernel_cfg):
@@ -125,7 +125,7 @@ class ErrorKernel(abc.ABC):
         ...
 
 
-class TestErrorKernel(ErrorKernel):
+class MockErrorKernel(ErrorKernel):
     """
     ErrorKernel used for testing and scaffold validation.
 
@@ -135,14 +135,14 @@ class TestErrorKernel(ErrorKernel):
     @classmethod
     def from_config(cls, config: dict) -> Self:
         """
-        Instantiate a TestErrorKernel from the `[sampling]` table of
+        Instantiate a MockErrorKernel from the `[sampling]` table of
         the .toml configuration file.
         """
         return cls()
 
     def apply(self, ds: xr.Dataset) -> xr.Dataset:
         """
-        Apply the TestErrorKernel to an xarray.Dataset of synthetic observations.
+        Apply the MockErrorKernel to an xarray.Dataset of synthetic observations.
 
         Parameters
         ----------
@@ -155,7 +155,7 @@ class TestErrorKernel(ErrorKernel):
             Synthetic observations dataset unchanged.
         """
         logger.debug(
-            "Applying TestErrorKernel -> returns synthetic observations dataset unchanged."
+            "Applying MockErrorKernel -> returns synthetic observations dataset unchanged."
         )
         return ds
 
@@ -293,7 +293,7 @@ class ObsSampler(abc.ABC):
 # -- ObsSampler Implementations -- #
 
 
-class TestObsSampler(ObsSampler):
+class MockObsSampler(ObsSampler):
     """
     ObsSampler used for testing and scaffold validation.
 
@@ -304,13 +304,13 @@ class TestObsSampler(ObsSampler):
     @classmethod
     def from_config(cls, config: dict) -> Self:
         """
-        Instantiate a TestObsSampler from the `[sampling]` table of
+        Instantiate a MockObsSampler from the `[sampling]` table of
         the .toml configuration file.
         """
         # -- Collect ErrorKernel instances from configuration -- #
         error_kernels = get_error_kernels(config=config)
 
-        # -- Instantiate TestObsSampler with collected ErrorKernel instances -- #
+        # -- Instantiate MockObsSampler with collected ErrorKernel instances -- #
         return cls(error_kernels=error_kernels or None)
 
     def collect_samples(self, ds: xr.Dataset) -> xr.Dataset:
@@ -329,6 +329,6 @@ class TestObsSampler(ObsSampler):
             Synthetic observations dataset (unchanged from input).
         """
         logger.debug(
-            "Collecting samples with TestObsSampler -> returns input dataset unchanged."
+            "Collecting samples with MockObsSampler -> returns input dataset unchanged."
         )
         return ds

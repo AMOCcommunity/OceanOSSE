@@ -9,10 +9,10 @@ Created By: Ollie Tooth (oliver.tooth@noc.ac.uk)
 # -- Import Dependencies -- #
 import logging
 
-from OceanOSSE.gridding.regridder import Regridder, TestRegridder
+from OceanOSSE.gridding.regridder import MockRegridder, Regridder
 from OceanOSSE.io.dataloader import DataLoader, NetCDFDataLoader
 from OceanOSSE.io.datawriter import DataWriter, NetCDFDataWriter
-from OceanOSSE.sampling.sampler import ObsSampler, TestObsSampler
+from OceanOSSE.sampling.sampler import MockObsSampler, ObsSampler
 from OceanOSSE.utils import import_class, load_config
 
 logger = logging.getLogger(__name__)
@@ -20,9 +20,9 @@ logger = logging.getLogger(__name__)
 # -- Registries -- #
 _DATA_LOADER_REGISTRY: dict[str, type[DataLoader]] = {"netcdf": NetCDFDataLoader}
 
-_OBS_SAMPLER_REGISTRY: dict[str, type[ObsSampler]] = {"test": TestObsSampler}
+_OBS_SAMPLER_REGISTRY: dict[str, type[ObsSampler]] = {"test": MockObsSampler}
 
-_REGRIDDER_REGISTRY: dict[str, type[Regridder]] = {"test": TestRegridder}
+_REGRIDDER_REGISTRY: dict[str, type[Regridder]] = {"test": MockRegridder}
 
 _DATA_WRITER_REGISTRY: dict[str, type[DataWriter]] = {"netcdf": NetCDFDataWriter}
 

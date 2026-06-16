@@ -84,7 +84,7 @@ class Regridder(abc.ABC):
 # -- Regridder Implementations -- #
 
 
-class TestRegridder(Regridder):
+class MockRegridder(Regridder):
     """
     Regridder used for testing and scaffold validation.
 
@@ -94,7 +94,7 @@ class TestRegridder(Regridder):
     @classmethod
     def from_config(cls, config: dict) -> Self:
         """
-        Instantiate a TestRegridder from the `[regridding]` table of
+        Instantiate a MockRegridder from the `[regridding]` table of
         the .toml configuration file.
         """
         return cls()
@@ -114,9 +114,9 @@ class TestRegridder(Regridder):
             Dataset of synthetic observations (unchanged from input).
         """
         logger.debug(
-            "Regridding synthetic observations with TestRegridder -> returns input dataset unchanged."
+            "Regridding synthetic observations with MockRegridder -> returns input dataset unchanged."
         )
         logging.info(
-            "--> Completed: Regridded synthetic observations with TestRegridder."
+            "--> Completed: Regridded synthetic observations with MockRegridder."
         )
         return ds

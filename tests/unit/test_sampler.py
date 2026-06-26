@@ -90,8 +90,8 @@ def test_sampler_nn():
     
     # Synthetic profile
     prof_id = np.array([0, 1])
-    profile_lon = np.array([3.5, 1.2])
-    profile_lat = np.array([5.5, 2.2])
+    profile_lon = np.array([3.51, 1.2])
+    profile_lat = np.array([5.51, 2.2])
     profile = xr.Dataset(
         {
             "lon": (("profile_id"), profile_lon),

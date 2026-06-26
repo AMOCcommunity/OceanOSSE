@@ -160,12 +160,21 @@ class NNSampler(ObsSampler):
         lon_sub = np.abs(ds.lon - profile.lon)
         lat_sub = np.abs(ds.lat - profile.lat)
         dist = ((lon_sub + lat_sub) / 2)
-        stacked = dist.stack(gridpoint=("j", "i"))
-
-        # argsort find the smallest mean difference of lon and lat
-
-        nearest = stacked.argsort(axis=-1)
-        ji = stacked.gridpoint.isel(gridpoint=nearest.isel(gridpoint=0))
+        dist = dist.stack(gridpoint=("j", "i"))
+        
+        # Tiny tie-break penalties to sort dist, j , i
+        # Gives consitent results and 0.5 rounds up
+        if (dist.min("gridpoint") == 0.5).any():
+            score = (
+                dist
+                - 1e-6 * dist["j"]
+                - 1e-9 * dist["i"]
+                )
+        else:
+            score = dist
+        
+        nearest = score.argmin("gridpoint")
+        ji = score["gridpoint"].isel(gridpoint=nearest)        
 
         i_nn = ji["i"]
         j_nn = ji["j"]

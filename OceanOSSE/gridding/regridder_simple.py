@@ -51,8 +51,7 @@ class SwapRegridder(Regridder):
     ) -> None:
         if target_grid is not None and not isinstance(target_grid, xr.Dataset):
             raise TypeError("``target_grid`` must be an xarray.Dataset or None.")
-        self._target_grid = target_grid
-        self.ds_clim = self.climatology()
+        self.target_grid = target_grid
 
     def __repr__(self) -> str:
         has_grid = self._target_grid is not None
@@ -79,7 +78,7 @@ class SwapRegridder(Regridder):
         return self
 
     
-    def regrid(self, ds: xr.Dataset) -> xr.Dataset:
+    def regrid(self, ds_profile: xr.Dataset) -> xr.Dataset:
         """
         Regrid the synthetic observation dataset into the target grid.
 
@@ -93,24 +92,33 @@ class SwapRegridder(Regridder):
         xarray.Dataset
             Dataset of synthetic observations placed into target grid.
         """
-        # Use indices in synthetic profile set to replace data in the climatology with model data
-        ds_model = self.ds_clim
-        n_profile = len(ds.coords['profile_id'])
+        # Use indices in synthetic profile set to replace data in the 
+        # climatology with model data
+        ds_model = self.target_grid # in future this will already be a climatology
         
+        # calculate month for profiles to put them on climatology
+        ds_profile = ds_profile.assign_coords(
+            month=("profile_id", ds_profile.t.dt.strftime("%m").astype(int).data)
+        )
+        
+        n_profile = len(ds_profile.coords['profile_id'])
+
         # loop over profiles
         for p in range(n_profile):
-            i_ind = ds.coords['i'][p].to_numpy()
-            j_ind = ds.coords['j'][p].to_numpy()
-            t_ind = ds.coords['t'][p].to_numpy()
-            ps = ds.coords['profile_id'][p].to_numpy()
+            i_ind = ds_profile.coords['i'][p].to_numpy()
+            j_ind = ds_profile.coords['j'][p].to_numpy()
+            t_ind = ds_profile.coords['t'][p].to_numpy()
+            ps = ds_profile.coords['profile_id'][p].to_numpy()
 
-            profile = ds['votemper'].isel(profile_id=ps)
+            profile = ds_profile['votemper'].isel(profile_id=ps)
             
             ds_model['votemper'].loc[
                 dict(
-                    t=ds.t.sel(profile_id=ps),
-                    j=ds.j.sel(profile_id=ps),
-                    i=ds.i.sel(profile_id=ps))
+                    #month=ds_profile.month.sel(profile_id=ps),
+                    t=ds_profile.t.sel(profile_id=ps),
+                    j=ds_profile.j.sel(profile_id=ps),
+                    i=ds_profile.i.sel(profile_id=ps))
+                    #d=ds_profile.d.sel(profile_id=ps))
                 ] = profile.values
             
         return ds_model

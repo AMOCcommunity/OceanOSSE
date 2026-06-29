@@ -26,13 +26,10 @@ import numpy as np
 import xarray as xr
 from OceanOSSE.sampling.sampler_nearest_neighbour import NNSampler
 
-def test_sampler():
+def test_sampler(synthetic_ds):
     """
     Tests for extracting a profile that falls on a model grid point.
     """
-    # Build dataset
-    ds = construct_ds()
-
     # Synthetic profile
     prof_id = np.array([0])
     profile_lon = np.array([3])
@@ -48,18 +45,15 @@ def test_sampler():
     )
 
     sampler = NNSampler()
-    model_t = sampler.sample(ds, profile)
+    model_t = sampler.sample(synthetic_ds, profile)
     
-    assert (model_t.votemper.to_numpy().squeeze() == ds.votemper[:, 5, 3]).all()
+    assert (model_t.votemper.to_numpy().squeeze() == synthetic_ds.votemper[:, 5, 3]).all()
     
     
-def test_sampler_multi():
+def test_sampler_multi(synthetic_ds):
     """
     Tests for extracting multiple profiles that falls on a model grid point.
     """
-    # Build dataset
-    ds = construct_ds()
-
     # Synthetic profile
     prof_id = np.array([0, 1])
     profile_lon = np.array([3, 8])
@@ -75,19 +69,17 @@ def test_sampler_multi():
     )
 
     sampler = NNSampler()
-    model_t = sampler.sample(ds, profile)
+    model_t = sampler.sample(synthetic_ds, profile)
     
-    assert (model_t.votemper.isel(profile_id=1) == ds.votemper[:, 6, 8]).all()
+    assert (model_t.votemper.isel(profile_id=1) == synthetic_ds.votemper[:, 6, 8]).all()
     
     
-def test_sampler_nn():
+def test_sampler_nn(synthetic_ds):
     """
     Test for extracting a profile that falls between model grid points that will use nearest 
     neighbour against analytic form.
     """
-    # Build dataset
-    ds = construct_ds()
-    
+   
     # Synthetic profile
     prof_id = np.array([0, 1])
     profile_lon = np.array([3.50, 1.2])
@@ -103,14 +95,15 @@ def test_sampler_nn():
     )
    
     sampler = NNSampler()
-    model_t = sampler.sample(ds, profile)
+    model_t = sampler.sample(synthetic_ds, profile)
     print(model_t)
     
-    assert ((model_t.votemper.isel(profile_id=0) == ds.votemper[:, 6, 4]).all() 
-            & (model_t.votemper.isel(profile_id=1) == ds.votemper[:, 2, 1]).all())
-    
-
-def construct_ds():
+    assert ((model_t.votemper.isel(profile_id=0) == synthetic_ds.votemper[:, 6, 4]).all() 
+            & (model_t.votemper.isel(profile_id=1) == synthetic_ds.votemper[:, 2, 1]).all())
+   
+ 
+@pytest.fixture
+def synthetic_ds() -> xr.Dataset:
     """
     Build a dataset for testing.
     """

@@ -44,6 +44,27 @@ def test_regrid():
     assert ((ds_model != ds_clim) 
             & (ds_model.isel(i=3, j=5, t=31) == synth_profiles.isel(profile_id=0)))
     
+def test_climatology():
+    """
+    Test producing a daily climatology.
+    """
+    ds = construct_ds()
+    clim = climatology(ds)
+    
+    ts = ds.votemper.mean(dim=["d", "j", "i"])
+    clim_mean = clim.votemper.mean(dim=["d", "j", "i"])
+        
+    st_date = dt.datetime(2020, 5, 1)
+    test_sec1 = (dt.datetime(2020, 5, 30) - st_date).days
+    test_sec2 = (dt.datetime(2021, 5, 30) - st_date).days
+    test_temp1 = 15 - (0 * 0.4) + (0 * 0.2) - (0 * 0.2) + (test_sec1 * 0.000005)
+    test_temp2 = 15 - (0 * 0.4) + (0 * 0.2) - (0 * 0.2) + (test_sec2 * 0.000005)
+    test_temp = (test_temp1 + test_temp2) / 2
+    clim_day = clim.votemper.sel(t='2020-05-30').isel(d=0, j=0, i=0)
+    
+    assert (np.isclose(ts.mean().to_numpy(), clim_mean.mean().to_numpy(), atol=1e8)
+             & (clim_day.to_numpy() == test_temp))
+
     
 def construct_ds():
     """

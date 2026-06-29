@@ -50,19 +50,24 @@ def test_climatology():
     """
     ds = construct_ds()
     clim = climatology(ds)
+    print(clim)
     
     ts = ds.votemper.mean(dim=["d", "j", "i"])
     clim_mean = clim.votemper.mean(dim=["d", "j", "i"])
         
-    st_date = dt.datetime(2020, 5, 1)
-    test_sec1 = (dt.datetime(2020, 5, 30) - st_date).days
-    test_sec2 = (dt.datetime(2021, 5, 30) - st_date).days
+    st_date1 = dt.datetime(2020, 5, 1)
+    st_date2 = dt.datetime(2021, 5, 1)
+    test_date1 = np.array([st_date1 + dt.timedelta(days=x) for x in range(31)])
+    test_date2 = np.array([st_date2 + dt.timedelta(days=x) for x in range(31)])
+    test_sec1 = np.array([(x - st_date1).days for x in test_date1])
+    test_sec2 = np.array([(x - st_date1).days for x in test_date2])
+    print(test_sec1)
     test_temp1 = 15 - (0 * 0.4) + (0 * 0.2) - (0 * 0.2) + (test_sec1 * 0.000005)
     test_temp2 = 15 - (0 * 0.4) + (0 * 0.2) - (0 * 0.2) + (test_sec2 * 0.000005)
-    test_temp = (test_temp1 + test_temp2) / 2
-    clim_day = clim.votemper.sel(t='2020-05-30').isel(d=0, j=0, i=0)
+    test_temp = np.sum(test_temp1 + test_temp2) / (2 * 31)
+    clim_day = clim.votemper.sel(t='2020-05-01').isel(d=0, j=0, i=0)
     
-    assert (np.isclose(ts.mean().to_numpy(), clim_mean.mean().to_numpy(), atol=1e8)
+    assert (np.isclose(ts.mean().to_numpy(), clim_mean.mean().to_numpy(), atol=1e-8)
              & (clim_day.to_numpy() == test_temp))
 
     

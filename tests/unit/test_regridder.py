@@ -34,12 +34,14 @@ def test_regrid():
     Test replacing profiles in climatology with model data.
     """
     ds = construct_ds()
+    ds_clim = climatology(ds)
     synth_profiles = construct_profile_ds()
     
-    regrid_data = SwapRegridder(ds)
+    regrid_data = SwapRegridder(ds_clim)
     ds_model = regrid_data.regrid(synth_profiles)
+    print(ds_model)
 
-    assert ((ds_model != regrid_data.ds_clim) 
+    assert ((ds_model != ds_clim) 
             & (ds_model.isel(i=3, j=5, t=31) == synth_profiles.isel(profile_id=0)))
     
     
@@ -116,3 +118,34 @@ def construct_profile_ds():
     )
 
     return ds
+
+
+def climatology(ds):
+    """
+    Calculate the climatology of the target grid.
+    
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Input time varying dataset.
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset of monthly means.
+    """
+    ds = ds.assign_coords(
+        month=("t", ds.t.dt.strftime("%m").astype(int).data)
+    )
+    # calculate climatology
+    ds_clim = ds.groupby('month').mean()
+
+    # tile the climatology data back over full time series
+    ds_clim_full = ds_clim.sel(month=ds.month)
+
+    # Remove not needed time dim from variables
+    for v in ["lat", "lon", "depth"]:
+        ds_clim_full[v] = ds_clim_full[v].isel(t=0, drop=True)
+    #ds_clim_full = ds_clim_full.drop_vars('month')
+        
+    return ds_clim_full

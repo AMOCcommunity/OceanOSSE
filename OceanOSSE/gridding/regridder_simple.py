@@ -52,6 +52,9 @@ class SwapRegridder(Regridder):
         if target_grid is not None and not isinstance(target_grid, xr.Dataset):
             raise TypeError("``target_grid`` must be an xarray.Dataset or None.")
         self.target_grid = target_grid
+        # In future load these names from config
+        self.varlist = ['votemper', 'vosaline']
+        self.upper = 2000 # upper ocean threshold
 
     def __repr__(self) -> str:
         has_grid = self._target_grid is not None
@@ -74,7 +77,6 @@ class SwapRegridder(Regridder):
         Self
             Initialised Regridder instance.
         """
-        
         return self
 
     
@@ -84,43 +86,99 @@ class SwapRegridder(Regridder):
 
         Parameters
         ----------
-        ds : xarray.Dataset
-            Synthetic observations dataset.
+        ds_profile : xarray.Dataset
+            Model profile dataset.
 
         Returns
         -------
         xarray.Dataset
             Dataset of synthetic observations placed into target grid.
         """
-        # Use indices in synthetic profile set to replace data in the 
-        # climatology with model data
-        ds_model = self.target_grid # in future this will already be a climatology
-        
+        ds_zeros = self.initialise_anomaly(ds_profile)
+
+        ds_anom = self.insert_profiles(ds_profile, ds_zeros)
+        # select data above 2000 m
+        ds_anom = ds_anom.where(ds_anom.depth > self.upper)
+
+        ds_out = ds_anom + self.target_grid
+
+        return ds_out
+    
+
+    def initialise_anomaly(self, ds_profile):
+        """
+        Make a dataset of zeros on the same grid as the climatology.
+
+        Parameters
+        ----------
+        ds_profile : xarray.Dataset
+            Model profile dataset.
+
+        Returns
+        -------
+        xarray.Dataset
+            zeros on target grid.
+        """
+        # initialise a zero array to sum profile anomalies on
+        zero_anomaly = np.zeros((list(self.target_grid.sizes.values())))
+        ds_zeros = self.target_grid.copy(deep=True)
+
+        for var in self.varlist:
+            if var not in list(ds_profile.keys()):
+                raise ValueError(var + " is not in the profile dataset.")
+            if var not in list(self.target_grid.keys()):
+                raise ValueError(var + " is not in the climatology dataset.")
+            
+            
+            ds_zeros[var].data = zero_anomaly.copy()
+
+        return ds_zeros
+
+
+    def insert_profiles(self, ds_profile, ds_anom):
+        """
+        Regrid the synthetic observation dataset into the target grid.
+
+        Parameters
+        ----------
+        ds_profile : xarray.Dataset
+            Model profile dataset.
+        ds_anom : xarray.Dataset
+            zeros on target grid.
+
+        Returns
+        -------
+        xarray.Dataset
+            Dataset of summed anomaly model profiles.
+        """
+
         # calculate month for profiles to put them on climatology
         ds_profile = ds_profile.assign_coords(
-            month=("profile_id", ds_profile.t.dt.strftime("%m").astype(int).data)
-        )
+            month=("profile_id", 
+            ds_profile.t.dt.strftime("%m").astype(int).data))
         
         n_profile = len(ds_profile.coords['profile_id'])
 
-        # loop over profiles
-        for p in range(n_profile):
-            i_ind = ds_profile.coords['i'][p].to_numpy()
-            j_ind = ds_profile.coords['j'][p].to_numpy()
-            t_ind = ds_profile.coords['t'][p].to_numpy()
-            ps = ds_profile.coords['profile_id'][p].to_numpy()
+        # Use indices in synthetic profile set to replace data in the 
+        # climatology with model data
 
-            profile = ds_profile['votemper'].isel(profile_id=ps)
+        for var in self.varlist:
+            # loop over profiles
+            for p in range(n_profile):
+                i_ind = ds_profile.coords['i'][p].to_numpy()
+                j_ind = ds_profile.coords['j'][p].to_numpy()
+                t_ind = ds_profile.coords['t'][p].to_numpy()
+                ps = ds_profile.coords['profile_id'][p].to_numpy()
+
+                profile = ds_profile[var].isel(profile_id=ps)
+                
+                ds_anom[var].loc[
+                    dict(
+                        t=ds_profile.t.sel(profile_id=ps),
+                        j=ds_profile.j.sel(profile_id=ps),
+                        i=ds_profile.i.sel(profile_id=ps))
+                    ] += profile.data
             
-            ds_model['votemper'].loc[
-                dict(
-                    #month=ds_profile.month.sel(profile_id=ps),
-                    t=ds_profile.t.sel(profile_id=ps),
-                    j=ds_profile.j.sel(profile_id=ps),
-                    i=ds_profile.i.sel(profile_id=ps))
-                    #d=ds_profile.d.sel(profile_id=ps))
-                ] = profile.values
-            
-        return ds_model
-    
-    
+        return ds_anom
+
+

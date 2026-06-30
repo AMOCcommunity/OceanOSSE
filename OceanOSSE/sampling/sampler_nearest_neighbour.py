@@ -86,13 +86,14 @@ class NNSampler(ObsSampler):
         xarray.Dataset
             Sampled synthetic observations dataset.
         """
+        t_nn = self.find_nearest_time(ds, profile)
         if ij:
             i_nn, j_nn = self.find_nearest_ij(ds, profile)
-            ds_synth = self.extract_locations_ij(ds, i_nn, j_nn)
+            ds_synth = self.extract_locations_ij(ds, i_nn, j_nn, t_nn)
         
         else:
             ds = self.find_nearest_geoball(ds)
-            ds_synth = self.extract_locations_geoball(ds, profile)
+            ds_synth = self.extract_locations_geoball(ds, profile, t_nn)
         
         return ds_synth
     
@@ -147,7 +148,40 @@ class NNSampler(ObsSampler):
         ds_obs = self.apply_errors(ds_sampled)
 
         return ds_obs
+
     
+    def time_bounds(self, ds, profile):
+        """
+        Remove profiles that are out of model bounds in time.
+        
+        Parameters
+        ----------
+        ds : xarray.Dataset
+            Gridded ocean model dataset.
+        profile : xarray.Dataset 
+            observation profile dataset
+
+        Return
+        profile : xarray.Dataset
+            observation profile dataset
+        """
+        st_date = ds.time.min(dim="t").to_numpy()
+        en_date = ds.time.max(dim="t").to_numpy()
+        p_time = profile.time.to_numpy()
+        
+        t_index = (p_time >= st_date) & (p_time <= en_date)
+        n_reject = np.sum(np.invert(t_index).astype(int))
+        n_total = profile.time.size
+        logging.info('Profiles rejected for being outside time bounds: {:.2f}'.format((n_reject / n_total) * 100))
+        print('Profiles rejected for being outside time bounds: {:.2f}%'.format((n_reject / n_total) * 100))
+        if n_reject / n_total == 1:
+            raise ValueError("All profiles outside model time bounds.")
+        
+        t_xa = xr.DataArray(t_index, coords={"profile_id": profile.coords['profile_id']})
+        profile = profile.where(t_xa, drop=True)
+
+        return profile
+ 
     
     def find_nearest_ij(self, ds, profile):
         """
@@ -189,8 +223,43 @@ class NNSampler(ObsSampler):
 
         return i_nn, j_nn
 
+
+    def find_nearest_time(self, ds, profile, thresh=10):
+        """
+        Turn observation time into model time index
+
+        Parameters
+        ----------
+        ds : xarray.Dataset
+            Gridded ocean model dataset.
+        profile : xarray.Dataset 
+            observation profile dataset
+        thresh : int 
+            threshold in model timesteps for a profile being out of time bounds
+
+        Return
+        index: indicies of model in time
+        """
+        # Time difference in microsec
+        time_delta = np.abs(ds.time - profile.time)
+
+        # Find nearest and take first occurance (i.e. round down)
+        nearest = time_delta.argmin("t")
+        t_near = time_delta.isel(t=nearest)
+
+        t_nn = t_near["t"]
+
+        # Check for out of bounds
+        n_profile = len(profile.coords['profile_id'])
+        for p in range(n_profile):
+            ps = profile.coords['profile_id'][p].to_numpy()
+            if time_delta.sel(profile_id=ps).min() > (ds.time.isel(t=1) - ds.time.isel(t=0)):
+                raise ValueError("Profile time is outside model time bounds.")
+        
+        return t_nn
+
     
-    def extract_locations_ij(self, ds, i_index, j_index):
+    def extract_locations_ij(self, ds, i_index, j_index, t_index):
         """
         Extract a model profile at the specified model index.
 
@@ -200,13 +269,14 @@ class NNSampler(ObsSampler):
             Gridded ocean model dataset.
         i_index : observation index on model grid in i direction
         j_index : observation index on model grid in j direction
+        t_index : observation index in time
 
         Return
         xarray.Dataset
             Model profile dataset
         """
 
-        ds_model_profile = ds.isel(i=i_index, j=j_index)
+        ds_model_profile = ds.isel(i=i_index, j=j_index, t=t_index)
         
         return ds_model_profile
         
@@ -235,7 +305,7 @@ class NNSampler(ObsSampler):
 
         return ds
 
-    def extract_locations_geoball(self, ds, profile):
+    def extract_locations_geoball(self, ds, profile, t_index):
         """
         Extract a model profile at the obs profile lat and lon.
 
@@ -244,6 +314,7 @@ class NNSampler(ObsSampler):
         ds : xarray.Dataset
             Gridded ocean model dataset.
         profile : xarray.Dataset observation profile dataset
+        t_index : observation index in time
 
         Return
         xarray.Dataset
@@ -255,6 +326,8 @@ class NNSampler(ObsSampler):
             self.lat_name: profile[self.prof_lat_name], 
             self.lon_name: profile[self.prof_lon_name]}, 
             method='nearest')
+        ds_model_profile = ds_model_profile.isel(t=t_index)
+
         ds_model_profile = ds_model_profile.assign_coords(profile_id=profile["profile_id"])
         ds_model_profile = ds_model_profile.reset_coords(['lat', 'lon'])
       

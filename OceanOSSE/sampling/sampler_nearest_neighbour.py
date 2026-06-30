@@ -174,7 +174,7 @@ class NNSampler(ObsSampler):
             score = (
                 dist
                 - 1e-6 * dist["j"]
-                + 1e-9 * dist["i"]
+                - 1e-9 * dist["i"]
                 )
         else:
             score = dist

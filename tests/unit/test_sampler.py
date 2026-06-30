@@ -99,7 +99,7 @@ def test_sampler_nn(synthetic_ds):
     print(model_t)
     
     assert ((model_t.votemper.isel(profile_id=0) 
-            == synthetic_ds.votemper[:, 6, 3]).all() 
+            == synthetic_ds.votemper[:, 6, 4]).all() 
             & (model_t.votemper.isel(profile_id=1) 
             == synthetic_ds.votemper[:, 2, 1]).all())
   
@@ -112,8 +112,8 @@ def test_sampler_geoball(synthetic_ds):
    
     # Synthetic profile
     prof_id = np.array([0, 1])
-    profile_lon = np.array([3.50, 1.2])
-    profile_lat = np.array([5.50, 2.2])
+    profile_lon = np.array([3.60, 1.2])
+    profile_lat = np.array([5.60, 2.2])
     profile = xr.Dataset(
         {
             "lon": (("profile_id"), profile_lon),
@@ -129,7 +129,7 @@ def test_sampler_geoball(synthetic_ds):
     print(model_t)
     
     assert ((model_t.votemper.isel(profile_id=0) 
-            == synthetic_ds.votemper[:, 6, 3]).all() 
+            == synthetic_ds.votemper[:, 6, 4]).all() 
             & (model_t.votemper.isel(profile_id=1) 
             == synthetic_ds.votemper[:, 2, 1]).all())
  

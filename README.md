@@ -51,7 +51,7 @@ pip install .
 Clone the repository and set up the full development environment:
 
 ```bash
-git clone https://github.com/AMOCcommunity/OceanOSSE/.git
+git clone https://github.com/AMOCcommunity/OceanOSSE.git
 cd OceanOSSE
 pixi install
 ```

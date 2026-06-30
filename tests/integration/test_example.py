@@ -19,17 +19,27 @@ from OceanOSSE.sampling.sampler import MockErrorKernel, MockObsSampler
 
 # Example integration test class:
 class TestOceanOSSEExample:
-    def test_DataLoader_config(self, example_config: dict):
+    def test_DataLoader_inputs_config(self, example_config: dict):
         # Initialise example DataLoader using test configuration:
-        dataloader = NetCDFDataLoader.from_config(config=example_config)
+        dataloader = NetCDFDataLoader.from_config(config=example_config, table="inputs")
         # Verify DataLoader attributes:
         assert dataloader._source == example_config["inputs"]["variables"]
         assert dataloader._dimensions == example_config["inputs"]["dimensions"]
         assert dataloader._coordinates == example_config["inputs"]["coordinates"]
+        assert dataloader._table == "inputs"
 
-    def test_DataLoader_load_data(self, example_config: dict):
+    def test_DataLoader_climatology_config(self, example_config: dict):
         # Initialise example DataLoader using test configuration:
-        dataloader = NetCDFDataLoader.from_config(config=example_config)
+        dataloader = NetCDFDataLoader.from_config(config=example_config, table="climatology")
+        # Verify DataLoader attributes:
+        assert dataloader._source == example_config["climatology"]["variables"]
+        assert dataloader._dimensions == example_config["climatology"]["dimensions"]
+        assert dataloader._coordinates == example_config["climatology"]["coordinates"]
+        assert dataloader._table == "climatology"
+
+    def test_DataLoader_inputs_load_data(self, example_config: dict):
+        # Initialise example DataLoader using test configuration:
+        dataloader = NetCDFDataLoader.from_config(config=example_config, table="inputs")
         # Load data using DataLoader:
         ds = dataloader.load_data()
         # Verify the integrity of xarray.Dataset:
@@ -42,6 +52,40 @@ class TestOceanOSSEExample:
         )
         assert set(ds.coords.keys()) == set(
             example_config["inputs"]["coordinates"].keys()
+        )
+
+    def test_DataLoader_climatology_load_data(self, example_config: dict):
+        # Initialise example DataLoader using test configuration:
+        dataloader = NetCDFDataLoader.from_config(config=example_config, table="climatology")
+        # Load data using DataLoader:
+        ds = dataloader.load_data()
+        # Verify the integrity of xarray.Dataset:
+        assert isinstance(ds, xr.Dataset)
+        assert set(ds.data_vars.keys()) == set(
+            example_config["climatology"]["variables"].keys()
+        )
+        assert set(ds.sizes.keys()) == set(
+            example_config["climatology"]["dimensions"].keys()
+        )
+        assert set(ds.coords.keys()) == set(
+            example_config["climatology"]["coordinates"].keys()
+        )
+
+    def test_DataLoader_compute_monthly_climatology(self, example_config: dict):
+        # Initialise example DataLoader using test configuration:
+        dataloader = NetCDFDataLoader.from_config(config=example_config, table="inputs")
+        # Compute monthly climatology from DataLoader:
+        ds = dataloader.compute_monthly_climatology()
+        # Verify the integrity of xarray.Dataset:
+        assert isinstance(ds, xr.Dataset)
+        assert set(ds.data_vars.keys()) == set(
+            list(example_config["climatology"]["variables"].keys()) + ["time_bnds"]
+        )
+        assert set(ds.sizes.keys()) == set(
+            list(example_config["climatology"]["dimensions"].keys()) + ["bnds"]
+        )
+        assert set(ds.coords.keys()) == set(
+            example_config["climatology"]["coordinates"].keys()
         )
 
     def test_Sampler_config(self, example_config: dict):

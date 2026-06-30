@@ -28,9 +28,9 @@ _DATA_WRITER_REGISTRY: dict[str, type[DataWriter]] = {"netcdf": NetCDFDataWriter
 
 
 # -- Factory Functions -- #
-def _create_DataLoader(config: dict) -> DataLoader:
+def _create_DataLoader(config: dict, table: str = "inputs") -> DataLoader:
     """
-    Instantiate a DataLoader from the `[inputs]` table of the .toml configuration file.
+    Instantiate a DataLoader from the specified table of the .toml configuration file.
 
     Options:
     - Built-in Registry:
@@ -42,24 +42,28 @@ def _create_DataLoader(config: dict) -> DataLoader:
     # -- Validate Inputs -- #
     if not isinstance(config, dict):
         raise TypeError("``config`` must be a dictionary.")
+    if not isinstance(table, str):
+        raise TypeError("``table`` must be a string.")
+    if table not in ["inputs", "climatology"]:
+        raise ValueError("``table`` must be either 'inputs' or 'climatology'.")
 
     # -- Instantiate DataLoader -- #
-    inputs = config["inputs"]
+    table = config[table]
 
     # 1. Plugin DataLoader:
-    if (inputs.get("module") is not None) and (inputs.get("name") is not None):
+    if (table.get("module") is not None) and (table.get("name") is not None):
         # -- Import custom DataLoader class -- #
         data_loader = import_class(
-            module=inputs["module"], class_name=inputs["name"], class_type=DataLoader
+            module=table["module"], class_name=table["name"], class_type=DataLoader
         )
         logger.info(
-            f"Completed: Created DataLoader from Plugin: {inputs['module']}.{inputs['name']}"
+            f"Completed: Created DataLoader from Plugin: {table['module']}.{table['name']}"
         )
 
     # 2. Registry DataLoader:
     else:
         # -- Use DataLoader class from registry -- #
-        format = inputs.get("format", "netcdf4")
+        format = table.get("format", "netcdf4")
         try:
             data_loader = _DATA_LOADER_REGISTRY[format]
         except KeyError as e:
@@ -70,7 +74,7 @@ def _create_DataLoader(config: dict) -> DataLoader:
             f"Completed: Created DataLoader from Registry -> {format}: {data_loader.__name__}"
         )
 
-    return data_loader.from_config(config=config)
+    return data_loader.from_config(config=config, table=table)
 
 
 def _create_ObsSampler(config: dict) -> ObsSampler:
@@ -167,7 +171,7 @@ def _create_Regridder(config: dict) -> Regridder:
     return regridder.from_config(config=config)
 
 
-def _create_DataWriter(config: dict) -> DataWriter:
+def _create_DataWriter(config: dict, climatology: bool = False) -> DataWriter:
     """
     Instantiate a DataWriter from the `[outputs]` table of the .toml configuration file.
 
@@ -181,6 +185,8 @@ def _create_DataWriter(config: dict) -> DataWriter:
     # -- Validate Inputs -- #
     if not isinstance(config, dict):
         raise TypeError("``config`` must be a dictionary.")
+    if not isinstance(climatology, bool):
+        raise TypeError("``climatology`` must be a boolean.")
 
     # -- Instantiate DataWriter -- #
     outputs = config["outputs"]
@@ -209,7 +215,7 @@ def _create_DataWriter(config: dict) -> DataWriter:
             f"Completed: Created DataWriter from Registry -> {format}: {data_writer.__name__}"
         )
 
-    return data_writer.from_config(config=config)
+    return data_writer.from_config(config=config, climatology=climatology)
 
 
 # -- Define Pipeline Functions -- #
@@ -218,7 +224,8 @@ def run_pipeline(args: dict) -> None:
     Run OceanOSSE pipeline using specified config .ini file.
 
     Pipeline Steps:
-    1. Instantiate DataLoader -> Load standardised ocean model dataset.
+    1a. Instantiate DataLoader -> Load standardised ocean model dataset.
+    1b. Compute or Load monthly climatology dataset.
     2. Instantiate ObsSampler -> Sample synthetic ocean observations from model dataset.
     3. Instantiate Regridder -> Regrid synthetic observations onto original model grid.
     4. Instantiate DataWriter -> Write output dataset to file.
@@ -235,9 +242,32 @@ def run_pipeline(args: dict) -> None:
     logger.info(f"Completed: Read & validated config file -> {args['config_file']}")
 
     # Load ocean model dataset using DataLoader:
-    data_loader = _create_DataLoader(config=config)
-    logger.info(f"In Progress: Loading ocean model dataset using {data_loader}...")
+    data_loader = _create_DataLoader(config=config, table="inputs")
+    logger.info(f"In Progress: Loading ocean input model dataset using {data_loader}...")
     ds_mdl = data_loader.load_data()
+    logger.info("Completed: Loaded ocean model input dataset.")
+
+    if config["climatology"].get("read_climatology", False):
+        # Calculate monthly climatology from model dataset:
+        logger.info(
+            "In Progress: Calculating monthly climatology from model input dataset..."
+        )
+        ds_clim = data_loader.compute_monthly_climatology()
+        logger.info("Completed: Calculated monthly climatology from model input dataset.")
+        clim_writer = _create_DataWriter(config=config, climatology=True)
+        logger.info(
+            f"In Progress: Writing monthly climatology to file using {clim_writer}..."
+        )
+        clim_output_filepath = clim_writer.write_data(ds=ds_clim)
+        logger.info(f"Completed: Written monthly climatology to file: {clim_output_filepath}")
+    else:
+        # Load monthly climatology from file:
+        clim_loader = _create_DataLoader(config=config, table="climatology")
+        logger.info(
+            f"In Progress: Loading monthly climatology from file using {clim_loader}..."
+        )
+        ds_clim = clim_loader.load_data()
+        logger.info("Completed: Loaded monthly climatology from file.")
 
     # === Sampling === #
     logger.info("==== Sampling ====")
@@ -262,7 +292,8 @@ def run_pipeline(args: dict) -> None:
     # Write output dataset to file using DataWriter:
     data_writer = _create_DataWriter(config=config)
     logger.info(f"In Progress: Writing output dataset to file using {data_writer}...")
-    data_writer.write_data(ds=ds_regridded)
+    output_filepath = data_writer.write_data(ds=ds_regridded)
+    logger.info(f"Completed: Written output dataset to file: {output_filepath}")
     # Close all files:
     for ds in [ds_mdl, ds_obs, ds_regridded]:
         ds.close()

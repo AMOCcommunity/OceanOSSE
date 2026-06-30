@@ -29,28 +29,27 @@ import xarray as xr
 from OceanOSSE.gridding.regridder_simple import SwapRegridder
 
     
-def test_regrid():
+def test_regrid(construct_ds, construct_profile_ds):
     """
     Test replacing profiles in climatology with model data.
     """
-    ds = construct_ds()
+    ds_profile = construct_profile_ds
+    ds = construct_ds
     ds_clim = climatology(ds)
-    synth_profiles = construct_profile_ds()
     
     regrid_data = SwapRegridder(ds_clim)
-    ds_model = regrid_data.regrid(synth_profiles)
-    print(ds_model)
+    ds_model = regrid_data.regrid(ds_profile)
 
     assert ((ds_model != ds_clim) 
-            & (ds_model.isel(i=3, j=5, t=31) == synth_profiles.isel(profile_id=0)))
+            & (ds_model.isel(i=3, j=5, t=31) 
+            == ds_profile.isel(profile_id=0)))
     
-def test_climatology():
+def test_climatology(construct_ds):
     """
     Test producing a daily climatology.
     """
-    ds = construct_ds()
+    ds = construct_ds
     clim = climatology(ds)
-    print(clim)
     
     ts = ds.votemper.mean(dim=["d", "j", "i"])
     clim_mean = clim.votemper.mean(dim=["d", "j", "i"])
@@ -61,7 +60,6 @@ def test_climatology():
     test_date2 = np.array([st_date2 + dt.timedelta(days=x) for x in range(31)])
     test_sec1 = np.array([(x - st_date1).days for x in test_date1])
     test_sec2 = np.array([(x - st_date1).days for x in test_date2])
-    print(test_sec1)
     test_temp1 = 15 - (0 * 0.4) + (0 * 0.2) - (0 * 0.2) + (test_sec1 * 0.000005)
     test_temp2 = 15 - (0 * 0.4) + (0 * 0.2) - (0 * 0.2) + (test_sec2 * 0.000005)
     test_temp = np.sum(test_temp1 + test_temp2) / (2 * 31)
@@ -70,8 +68,9 @@ def test_climatology():
     assert (np.isclose(ts.mean().to_numpy(), clim_mean.mean().to_numpy(), atol=1e-8)
              & (clim_day.to_numpy() == test_temp))
 
-    
-def construct_ds():
+
+@pytest.fixture
+def construct_ds() -> xr.Dataset:
     """
     Build a dataset for testing.
     """
@@ -87,11 +86,14 @@ def construct_ds():
     t, d, y, x = np.meshgrid(model_day, depth, lat, lon, indexing='ij')
 
     votemper = 15 - (y * 0.4) + (x * 0.2) - (d * 0.2) + (t * 0.000005)
+    vosaline = 33 + (y * 0.4) - (x * 0.2) + (d * 0.2) + (t * 0.000005)
         
     # Build dataset
     ds = xr.Dataset(
         {
             "votemper": (("t", "d", "j", "i"), votemper),
+            "vosaline": (("t", "d", "j", "i"), vosaline),
+
             "lat": (("j", "i"), y[0, 0, :, :]),
             "lon": (("j", "i"), x[0, 0, :, :]),
             "depth": (("d", "j", "i"), d[0, :, :, :]),
@@ -108,7 +110,8 @@ def construct_ds():
     return ds
 
 
-def construct_profile_ds():
+@pytest.fixture
+def construct_profile_ds()  -> xr.Dataset:
     d = np.arange(0, 150, 10)
     profile_id = np.arange(2)
 
@@ -126,10 +129,13 @@ def construct_profile_ds():
     time_day = np.array([(x - st_date).days for x in time])
     
     votemper = 15 - depth * 0.02 - j[None, :] * 0.2 + i[None, :] * 0.1 + (time_day * 0.000005)
+    vosaline = 33 + depth * 0.02 + j[None, :] * 0.2 - i[None, :] * 0.1 + (time_day * 0.000005)
+
 
     ds = xr.Dataset(
         data_vars={
             "votemper": (("d", "profile_id"), votemper),
+            "vosaline": (("d", "profile_id"), vosaline),
             "lat": (("profile_id",), j),
             "lon": (("profile_id",), i),
             "depth": (("d", "profile_id"), depth),

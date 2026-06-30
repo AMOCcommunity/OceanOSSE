@@ -98,9 +98,41 @@ def test_sampler_nn(synthetic_ds):
     model_t = sampler.sample(synthetic_ds, profile)
     print(model_t)
     
-    assert ((model_t.votemper.isel(profile_id=0) == synthetic_ds.votemper[:, 6, 4]).all() 
-            & (model_t.votemper.isel(profile_id=1) == synthetic_ds.votemper[:, 2, 1]).all())
+    assert ((model_t.votemper.isel(profile_id=0) 
+            == synthetic_ds.votemper[:, 6, 3]).all() 
+            & (model_t.votemper.isel(profile_id=1) 
+            == synthetic_ds.votemper[:, 2, 1]).all())
+  
+
+def test_sampler_geoball(synthetic_ds):
+    """
+    Test for extracting a profile that falls between model grid points that will use nearest 
+    neighbour against analytic form.
+    """
    
+    # Synthetic profile
+    prof_id = np.array([0, 1])
+    profile_lon = np.array([3.50, 1.2])
+    profile_lat = np.array([5.50, 2.2])
+    profile = xr.Dataset(
+        {
+            "lon": (("profile_id"), profile_lon),
+            "lat": (("profile_id"), profile_lat)
+        },
+        coords={
+            "profile_id": prof_id,
+        },
+    )
+   
+    sampler = NNSampler()
+    model_t = sampler.sample(synthetic_ds, profile, ij=False)
+    print(model_t)
+    
+    assert ((model_t.votemper.isel(profile_id=0) 
+            == synthetic_ds.votemper[:, 6, 3]).all() 
+            & (model_t.votemper.isel(profile_id=1) 
+            == synthetic_ds.votemper[:, 2, 1]).all())
+ 
  
 @pytest.fixture
 def synthetic_ds() -> xr.Dataset:

@@ -169,12 +169,12 @@ class NNSampler(ObsSampler):
         dist = dist.stack(gridpoint=("j", "i"))
         
         # Tiny tie-break penalties to sort dist, j , i
-        # Gives consitent results and 0.5 rounds up
+        # Gives consitent results and 0.5 rounds up on j and down on i
         if (dist.min("gridpoint") == 0.5).any():
             score = (
                 dist
                 - 1e-6 * dist["j"]
-                - 1e-9 * dist["i"]
+                + 1e-9 * dist["i"]
                 )
         else:
             score = dist

@@ -86,7 +86,9 @@ class NNSampler(ObsSampler):
         xarray.Dataset
             Sampled synthetic observations dataset.
         """
+        profile = self.time_bounds(ds, profile)
         t_nn = self.find_nearest_time(ds, profile)
+
         if ij:
             i_nn, j_nn = self.find_nearest_ij(ds, profile)
             ds_synth = self.extract_locations_ij(ds, i_nn, j_nn, t_nn)

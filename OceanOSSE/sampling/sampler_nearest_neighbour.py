@@ -232,7 +232,7 @@ class NNSampler(ObsSampler):
                 (self.lat_name, self.lon_name), 
                 NDPointIndex, 
                 tree_adapter_cls=SklearnGeoBallTreeAdapter))
-        print(ds)
+
         return ds
 
     def extract_locations_geoball(self, ds, profile):
@@ -254,7 +254,9 @@ class NNSampler(ObsSampler):
         ds_model_profile = ds.sel({
             self.lat_name: profile[self.prof_lat_name], 
             self.lon_name: profile[self.prof_lon_name]}, 
-            method='nearest')  
+            method='nearest')
+        ds_model_profile = ds_model_profile.assign_coords(profile_id=profile["profile_id"])
+        ds_model_profile = ds_model_profile.reset_coords(['lat', 'lon'])
       
         return ds_model_profile
 

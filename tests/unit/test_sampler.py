@@ -26,6 +26,28 @@ import numpy as np
 import xarray as xr
 from OceanOSSE.sampling.sampler_nearest_neighbour import NNSampler
 
+def test_sampler_coords(synthetic_ds):
+    # Synthetic profile
+    prof_id = np.array([0])
+    profile_lon = np.array([3])
+    profile_lat = np.array([5])
+    profile = xr.Dataset(
+        {
+            "lon": (("profile_id"), profile_lon),
+            "lat": (("profile_id"), profile_lat)
+        },
+        coords={
+            "profile_id": prof_id,
+        },
+    )
+
+    sampler = NNSampler()
+    model_t = sampler.sample(synthetic_ds, profile)
+    print(model_t)
+    assert ((set(model_t.dims) == {'d', 'profile_id'}) 
+            & (set(model_t.coords) == {'d', 'profile_id', 'i', 'j'}))
+
+
 def test_sampler(synthetic_ds):
     """
     Tests for extracting a profile that falls on a model grid point.
@@ -36,8 +58,8 @@ def test_sampler(synthetic_ds):
     profile_lat = np.array([5])
     profile = xr.Dataset(
         {
-            "lon": (("prof_id"), profile_lon),
-            "lat": (("prof_id"), profile_lat)
+            "lon": (("profile_id"), profile_lon),
+            "lat": (("profile_id"), profile_lat)
         },
         coords={
             "profile_id": prof_id,
@@ -96,13 +118,34 @@ def test_sampler_nn(synthetic_ds):
    
     sampler = NNSampler()
     model_t = sampler.sample(synthetic_ds, profile)
-    print(model_t)
     
     assert ((model_t.votemper.isel(profile_id=0) 
             == synthetic_ds.votemper[:, 6, 4]).all() 
             & (model_t.votemper.isel(profile_id=1) 
             == synthetic_ds.votemper[:, 2, 1]).all())
   
+
+def test_sampler_coords_geoball(synthetic_ds):
+    # Synthetic profile
+    prof_id = np.array([0])
+    profile_lon = np.array([3])
+    profile_lat = np.array([5])
+    profile = xr.Dataset(
+        {
+            "lon": (("profile_id"), profile_lon),
+            "lat": (("profile_id"), profile_lat)
+        },
+        coords={
+            "profile_id": prof_id,
+        },
+    )
+
+    sampler = NNSampler()
+    model_t = sampler.sample(synthetic_ds, profile, ij=False)
+
+    assert ((set(model_t.dims) == {'d', 'profile_id'}) 
+            & (set(model_t.coords) == {'d', 'profile_id', 'i', 'j'}))
+
 
 def test_sampler_geoball(synthetic_ds):
     """
@@ -126,13 +169,12 @@ def test_sampler_geoball(synthetic_ds):
    
     sampler = NNSampler()
     model_t = sampler.sample(synthetic_ds, profile, ij=False)
-    print(model_t)
     
     assert ((model_t.votemper.isel(profile_id=0) 
             == synthetic_ds.votemper[:, 6, 4]).all() 
             & (model_t.votemper.isel(profile_id=1) 
             == synthetic_ds.votemper[:, 2, 1]).all())
- 
+
  
 @pytest.fixture
 def synthetic_ds() -> xr.Dataset:

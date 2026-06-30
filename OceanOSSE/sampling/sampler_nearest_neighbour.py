@@ -27,6 +27,8 @@ import logging
 
 import xarray as xr
 import numpy as np
+from xarray.indexes import NDPointIndex
+from xoak import SklearnGeoBallTreeAdapter
 
 from OceanOSSE.utils import import_class
 from OceanOSSE.sampling.sampler import ErrorKernel, ObsSampler
@@ -70,7 +72,7 @@ class NNSampler(ObsSampler):
         return self
     
 
-    def collect_samples(self, ds, profile) -> xr.Dataset:
+    def collect_samples(self, ds, profile, ij=True) -> xr.Dataset:
         """
         Parameters
         ----------
@@ -84,9 +86,13 @@ class NNSampler(ObsSampler):
         xarray.Dataset
             Sampled synthetic observations dataset.
         """
-        i_nn, j_nn = self.find_nearest_ij(ds, profile)
+        if ij:
+            i_nn, j_nn = self.find_nearest_ij(ds, profile)
+            ds_synth = self.extract_locations_ij(ds, i_nn, j_nn)
         
-        ds_synth = self.extract_locations(ds, i_nn, j_nn)
+        else:
+            ds = self.find_nearest_geoball(ds)
+            ds_synth = self.extract_locations_geoball(ds, profile)
         
         return ds_synth
     
@@ -116,7 +122,7 @@ class NNSampler(ObsSampler):
         return ds
     
     
-    def sample(self, ds: xr.Dataset, profile: xr.Dataset) -> xr.Dataset:
+    def sample(self, ds: xr.Dataset, profile: xr.Dataset, ij=True) -> xr.Dataset:
         """
         Perform sampling pipeline for chosen ocean observing platform.
         
@@ -132,7 +138,7 @@ class NNSampler(ObsSampler):
             Synthetic observations dataset with errors applied.
         """
         # -- Sample the gridded ocean model output -- #
-        ds_sampled = self.collect_samples(ds, profile)
+        ds_sampled = self.collect_samples(ds, profile, ij)
         logging.info(
             "--> Completed: Collected samples from ocean model dataset using ObsSampler."
         )
@@ -182,9 +188,9 @@ class NNSampler(ObsSampler):
         j_nn = j_nn.drop_vars("gridpoint")
 
         return i_nn, j_nn
+
     
-    
-    def extract_locations(self, ds, i_index, j_index):
+    def extract_locations_ij(self, ds, i_index, j_index):
         """
         Extract a model profile at the specified model index.
 
@@ -197,10 +203,58 @@ class NNSampler(ObsSampler):
 
         Return
         xarray.Dataset
-            Synthetic observations dataset
+            Model profile dataset
         """
 
-        ds_synth = ds.isel(i=i_index, j=j_index)
+        ds_model_profile = ds.isel(i=i_index, j=j_index)
         
-        return ds_synth
+        return ds_model_profile
         
+
+    def find_nearest_geoball(self, ds):
+        """
+        Assign geoball distance indexer with lat and lon.
+
+        Parameters
+        ----------
+        ds : xarray.Dataset
+            Gridded ocean model dataset.
+
+        Return
+        index: indicies of model in i an j
+        """
+
+        self.lat_name = 'lat'
+        self.lon_name = 'lon'
+        ds = (ds.assign_coords({
+                self.lat_name: ds[self.lat_name], 
+                self.lon_name: ds[self.lon_name]}).set_xindex(
+                (self.lat_name, self.lon_name), 
+                NDPointIndex, 
+                tree_adapter_cls=SklearnGeoBallTreeAdapter))
+        print(ds)
+        return ds
+
+    def extract_locations_geoball(self, ds, profile):
+        """
+        Extract a model profile at the obs profile lat and lon.
+
+        Parameters
+        ----------
+        ds : xarray.Dataset
+            Gridded ocean model dataset.
+        profile : xarray.Dataset observation profile dataset
+
+        Return
+        xarray.Dataset
+            Model profile dataset
+        """
+        self.prof_lat_name = 'lat'
+        self.prof_lon_name = 'lon'
+        ds_model_profile = ds.sel({
+            self.lat_name: profile[self.prof_lat_name], 
+            self.lon_name: profile[self.prof_lon_name]}, 
+            method='nearest')  
+      
+        return ds_model_profile
+

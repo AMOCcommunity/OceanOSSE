@@ -14,6 +14,7 @@ import glob
 import logging
 from typing import Self
 
+import numpy as np
 import xarray as xr
 
 logger = logging.getLogger(__name__)
@@ -42,6 +43,9 @@ class DataLoader(abc.ABC):
         Mapping of standard dimension names to input dataset dimension names.
     _coordinates : dict[str, str]
         Mapping of standard coordinate names to input dataset coordinate names.
+    _table : str
+        Name of the table in the .toml configuration file. Options are 'inputs'
+        or 'climatology'. Default is 'inputs'.
     """
 
     def __init__(
@@ -49,6 +53,7 @@ class DataLoader(abc.ABC):
         source: dict[str, dict],
         dimensions: dict[str, str],
         coordinates: dict[str, str],
+        table: str = "inputs"
     ):
         # -- Verify Inputs -- #
         if not isinstance(source, dict):
@@ -57,25 +62,29 @@ class DataLoader(abc.ABC):
             raise TypeError("``dimensions`` must be a specfied as a dictionary.")
         if not isinstance(coordinates, dict):
             raise TypeError("``coordinates`` must be a specfied as a dictionary.")
+        if not isinstance(table, str):
+            raise TypeError("``table`` must be a specfied as a string.")
 
         # -- Class Attributes -- #
         self._source = source
         self._dimensions = dimensions
         self._coordinates = coordinates
+        self._table = table
 
     def __repr__(self) -> str:
         return (
             f"{type(self).__name__}("
             f"source={self._source!r}, "
             f"dimensions={self._dimensions!r}, "
-            f"coordinates={self._coordinates!r})"
+            f"coordinates={self._coordinates!r}, "
+            f"table={self._table!r})"
         )
 
     @classmethod
     @abc.abstractmethod
-    def from_config(cls, config: dict) -> Self:
+    def from_config(cls, config: dict, table: str = "inputs") -> Self:
         """
-        Abstract class method to instantiate a DataLoader from the `[inputs]` table
+        Abstract class method to instantiate a DataLoader from the specified table
         of the .toml configuration file.
 
         This is the required constructor for all DataLoader subclasses - plugin
@@ -86,6 +95,9 @@ class DataLoader(abc.ABC):
         config : dict
             Configuration dictionary containing input parameters from .toml
             configuration file.
+        table : str
+            Name of the table in the .toml configuration file. Options are
+            'inputs' or 'climatology'. Default is 'inputs'.
 
         Returns
         -------
@@ -107,6 +119,35 @@ class DataLoader(abc.ABC):
             Dataset containing standardised gridded ocean model variables.
         """
         ...
+
+    def compute_monthly_climatology(self) -> xr.Dataset:
+        """
+        Compute monthly climatology from the input xarray.Dataset.
+
+        Returns
+        -------
+        xarray.Dataset
+            Dataset containing monthly climatology of the input variables.
+        """
+        # -- Load Input Dataset -- #
+        ds = self.load_data()
+        start_yr = ds['time'].dt.year.min().item()
+        end_yr = ds['time'].dt.year.max().item()
+
+        # -- Compute Monthly Climatology -- #
+        ds_clim = ds.groupby("time.month").mean(dim="time", skipna=True)
+
+        # -- Assign Time Bounds -- #
+        # Update time bounds to reflect climatological period:
+        ds_clim['time_bnds'] = xr.DataArray(
+            np.zeros((12, 2), dtype='datetime64[ns]'),
+            dims=('month', 'bnds'),
+            coords={'month': ds_clim['month']},
+        )
+        ds_clim['time_bnds'].data[:, 0] = (np.datetime64(f'{start_yr}-01', 'M') + (np.timedelta64(1, 'M') * np.arange(ds['time'].size))).astype('datetime64[ns]')
+        ds_clim['time_bnds'].data[:, 1] = (np.datetime64(f'{end_yr}-01', 'M') + (np.timedelta64(1, 'M') * np.arange(ds['time'].size))).astype('datetime64[ns]')
+
+        return ds_clim
 
     def _standardise_dataset(self, ds: xr.Dataset) -> xr.Dataset:
         """
@@ -141,7 +182,7 @@ class DataLoader(abc.ABC):
 
         Parameters
         ----------
-        dataset : xarray.Dataset
+        ds : xarray.Dataset
             Dataset containing standardised gridded ocean model variables.
 
         Raises
@@ -150,7 +191,10 @@ class DataLoader(abc.ABC):
             If the dataset does not contain the required variables or dimensions.
         """
         # -- Validate Required Dimensions -- #
-        required_dims = ["time", "lev", "j", "i"]
+        if self._table == "climatology":
+            required_dims = ["month", "lev", "j", "i"]
+        else:
+            required_dims = ["time", "lev", "j", "i"]
         missing_dims = [dim for dim in required_dims if dim not in ds.dims]
         if missing_dims:
             raise ValueError(
@@ -159,7 +203,10 @@ class DataLoader(abc.ABC):
             )
 
         # -- Validate Required Coordinates -- #
-        required_coords = ["time", "depth", "lat", "lon"]
+        if self._table == "climatology":
+            required_coords = ["month", "depth", "lat", "lon"]
+        else:
+            required_coords = ["time", "depth", "lat", "lon"]
         missing_coords = [coord for coord in required_coords if coord not in ds.coords]
         if missing_coords:
             raise ValueError(
@@ -188,37 +235,57 @@ class NetCDFDataLoader(DataLoader):
         source: dict[str, dict],
         dimensions: dict[str, str],
         coordinates: dict[str, str],
+        table: str = "inputs",
     ) -> None:
         # -- Initialise parent DataLoader class -- #
-        super().__init__(source, dimensions, coordinates)
+        super().__init__(source, dimensions, coordinates, table)
 
     @classmethod
-    def from_config(cls, config: dict) -> Self:
+    def from_config(cls, config: dict, table: str = "inputs") -> Self:
         """
-        Instantiate a NetCDFDataLoader from the `[inputs]` table of the .toml configuration file.
+        Instantiate a NetCDFDataLoader from the specified table of the .toml configuration file.
+
+        Parameters
+        ----------
+        config : dict
+            Configuration dictionary.
+        table : str, optional
+            Name of the table in the .toml configuration file.
+            Options are 'inputs' or 'climatology'. Default is 'inputs'.
+
+        Returns
+        -------
+        NetCDFDataLoader
+            Instantiated NetCDFDataLoader object.
         """
         # -- Verify Input -- #
         if not isinstance(config, dict):
             raise TypeError("config must be a dictionary.")
+        if not isinstance(table, str):
+            raise TypeError("table must be a string.")
+        if table not in ["inputs", "climatology"]:
+            raise ValueError(
+                "table must be either 'inputs' or 'climatology'."
+            )
 
         # -- Instantiate DataLoader with source dict from config -- #
-        source = config["inputs"].get("variables", None)
+        source = config[table].get("variables", None)
         if source is None:
             raise ValueError(
-                "Missing 'variables' entry in [inputs] table of config .toml file."
+                f"Missing 'variables' entry in [{table}] table of config .toml file."
             )
-        dimensions = config["inputs"].get("dimensions", None)
+        dimensions = config[table].get("dimensions", None)
         if dimensions is None:
             raise ValueError(
-                "Missing 'dimensions' entry in [inputs] table of config .toml file."
+                f"Missing 'dimensions' entry in [{table}] table of config .toml file."
             )
-        coordinates = config["inputs"].get("coordinates", None)
+        coordinates = config[table].get("coordinates", None)
         if coordinates is None:
             raise ValueError(
-                "Missing 'coordinates' entry in [inputs] table of config .toml file."
+                f"Missing 'coordinates' entry in [{table}] table of config .toml file."
             )
 
-        return cls(source=source, dimensions=dimensions, coordinates=coordinates)
+        return cls(source=source, dimensions=dimensions, coordinates=coordinates, table=table)
 
     def _open_dataset(
         self,
@@ -342,13 +409,13 @@ class NetCDFDataLoader(DataLoader):
             ds = xr.merge(ds_list, compat="no_conflicts", join="exact")
 
         # -- Standardise dataset dimensions and coordinates -- #
-        ds = self._standardise_dataset(ds)
+        ds = self._standardise_dataset(ds=ds)
         logging.info(
             f"--> Completed: Standardised dataset dimensions {list(ds.sizes.keys())} and coordinates {list(ds.coords.keys())}."
         )
 
         # -- Validate standardised dataset -- #
-        self._validate_dataset(ds)
+        self._validate_dataset(ds=ds)
         logging.info("--> Completed: Validated standardised dataset.")
 
         return ds

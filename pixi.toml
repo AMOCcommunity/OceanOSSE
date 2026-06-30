@@ -67,7 +67,8 @@ twine = "*"
 # === Tasks === #
 
 [feature.dev.tasks]
-tests = { cmd = "pytest --maxfail=1 --tb=short tests/unit/", description = "Run OceanOSSE unit tests using pytest." }
+unit_tests = { cmd = "pytest --maxfail=1 --tb=short tests/unit/", description = "Run OceanOSSE unit tests using pytest." }
+integration_tests = { cmd = "pytest --maxfail=1 --tb=short tests/integration/", description = "Run OceanOSSE integration tests using pytest. For use on NOC Anemone HPC." }
 lint = { cmd = "ruff check OceanOSSE/ tests/", description = "Run code linting using Ruff." }
 fix = { cmd = "ruff check OceanOSSE/ tests/ --fix", description = "Run code linting and auto-fix issues using Ruff." }
 format = { cmd = "ruff format OceanOSSE/ tests/", description = "Run code formatting using Ruff." }

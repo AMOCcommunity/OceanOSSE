@@ -155,7 +155,6 @@ def test_sampler_coords_geoball(synthetic_ds):
 
     sampler = NNSampler()
     model_t = sampler.sample(synthetic_ds, profile, ij=False)
-    print(model_t)
 
     assert ((set(model_t.dims) == {'d', 'profile_id'}) 
             & (set(model_t.coords) == {'d', 'profile_id', 'i', 'j', 't'}))

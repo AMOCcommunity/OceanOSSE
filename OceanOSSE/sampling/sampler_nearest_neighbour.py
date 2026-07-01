@@ -87,15 +87,15 @@ class NNSampler(ObsSampler):
             Sampled synthetic observations dataset.
         """
         profile = self.time_bounds(ds, profile)
-        t_nn = self.find_nearest_time(ds, profile)
 
         if ij:
+            t_nn = self.find_nearest_time(ds, profile)
             i_nn, j_nn = self.find_nearest_ij(ds, profile)
             ds_synth = self.extract_locations_ij(ds, i_nn, j_nn, t_nn)
         
         else:
             ds = self.find_nearest_geoball(ds)
-            ds_synth = self.extract_locations_geoball(ds, profile, t_nn)
+            ds_synth = self.extract_locations_geoball(ds, profile)
         
         return ds_synth
     
@@ -298,16 +298,18 @@ class NNSampler(ObsSampler):
 
         self.lat_name = 'lat'
         self.lon_name = 'lon'
+        self.time_name = 'time'
         ds = (ds.assign_coords({
                 self.lat_name: ds[self.lat_name], 
-                self.lon_name: ds[self.lon_name]}).set_xindex(
+                self.lon_name: ds[self.lon_name],
+                self.time_name: ds[self.time_name]}).set_xindex(
                 (self.lat_name, self.lon_name), 
                 NDPointIndex, 
                 tree_adapter_cls=SklearnGeoBallTreeAdapter))
 
         return ds
 
-    def extract_locations_geoball(self, ds, profile, t_index):
+    def extract_locations_geoball(self, ds, profile):
         """
         Extract a model profile at the obs profile lat and lon.
 
@@ -316,7 +318,6 @@ class NNSampler(ObsSampler):
         ds : xarray.Dataset
             Gridded ocean model dataset.
         profile : xarray.Dataset observation profile dataset
-        t_index : observation index in time
 
         Return
         xarray.Dataset
@@ -324,14 +325,15 @@ class NNSampler(ObsSampler):
         """
         self.prof_lat_name = 'lat'
         self.prof_lon_name = 'lon'
+        self.prof_time_name = 'time'
         ds_model_profile = ds.sel({
+            self.time_name: profile[self.prof_time_name],
             self.lat_name: profile[self.prof_lat_name], 
             self.lon_name: profile[self.prof_lon_name]}, 
             method='nearest')
-        ds_model_profile = ds_model_profile.isel(t=t_index)
 
         ds_model_profile = ds_model_profile.assign_coords(profile_id=profile["profile_id"])
-        ds_model_profile = ds_model_profile.reset_coords(['lat', 'lon'])
+        ds_model_profile = ds_model_profile.reset_coords(['lat', 'lon', 'time'])
       
         return ds_model_profile
 

@@ -26,7 +26,7 @@ import datetime as dt
 import numpy as np
 import xarray as xr
 
-from OceanOSSE.gridding.regridder_simple import SwapRegridder
+from OceanOSSE.gridding.regridder_swap import SwapRegridder
 
     
 def test_regrid(construct_ds, construct_profile_ds):

@@ -91,6 +91,7 @@ class NNSampler(ObsSampler):
         if ij:
             t_nn = self.find_nearest_time(ds, profile)
             i_nn, j_nn = self.find_nearest_ij(ds, profile)
+            t_nn = t_nn.sel(profile_id=i_nn['profile_id'])
             ds_synth = self.extract_locations_ij(ds, i_nn, j_nn, t_nn)
         
         else:
@@ -164,7 +165,7 @@ class NNSampler(ObsSampler):
             observation profile dataset
 
         Return
-        profile : xarray.Dataset
+        xarray.Dataset
             observation profile dataset
         """
         st_date = ds.time.min(dim="t").to_numpy()
@@ -183,6 +184,47 @@ class NNSampler(ObsSampler):
         profile = profile.where(t_xa, drop=True)
 
         return profile
+
+
+    def space_bounds(self, ds, ji, score):
+        """
+        Remove profiles that are on land.
+        
+        Parameters
+        ----------
+        ds : xarray.Dataset
+            Gridded ocean model dataset.
+        ji : xarray.Dataset 
+            indicies of profile dataset
+        score : xarray.DataArray
+            distance score of profiles from grid points
+
+        Return
+        xarray.Dataset
+            indicies of profile dataset
+        """
+        n_total = ji.profile_id.size
+
+        # mask and recalculate distance to see if any points are on land.
+        mask = xr.DataArray(ds.votemper.isel({"d": 0, "t": 0}).isnull())
+        mask = mask.drop_vars(['t', 'd'])
+        mask = mask.stack(gridpoint=("j", "i"))
+        score_masked = score.where(~mask, drop=True)
+            
+        nearest = score_masked.argmin("gridpoint")
+        ji_masked = score_masked["gridpoint"].isel(gridpoint=nearest)
+        sea = (ji['i'] == ji_masked['i']) & (ji['j'] == ji_masked['j'])
+        ji = ji.where(sea, drop=True) 
+
+        n_reject = n_total - ji.profile_id.size
+        logging.info('Profiles rejected for being outside space bounds: '
+            + '{:.2f}'.format((n_reject / n_total) * 100))
+        print('Profiles rejected for being outside space bounds: ' 
+            + '{:.2f}%'.format((n_reject / n_total) * 100))
+        if n_reject / n_total == 1:
+            raise ValueError("All profiles outside model time bounds.")
+        
+        return ji
  
     
     def find_nearest_ij(self, ds, profile):
@@ -196,14 +238,14 @@ class NNSampler(ObsSampler):
         profile : xarray.Dataset observation profile dataset
 
         Return
-        index: indicies of model in i an j
+        index: indicies of model in i and j
         """
 
         lon_sub = np.abs(ds.lon - profile.lon)
         lat_sub = np.abs(ds.lat - profile.lat)
         dist = ((lon_sub + lat_sub) / 2)
         dist = dist.stack(gridpoint=("j", "i"))
-        
+      
         # Tiny tie-break penalties to sort dist, j , i
         # Gives consitent results and 0.5 rounds up on j and down on i
         if (dist.min("gridpoint") == 0.5).any():
@@ -216,7 +258,8 @@ class NNSampler(ObsSampler):
             score = dist
         
         nearest = score.argmin("gridpoint")
-        ji = score["gridpoint"].isel(gridpoint=nearest)        
+        ji = score["gridpoint"].isel(gridpoint=nearest)
+        ji = self.space_bounds(ds, ji, score)
 
         i_nn = ji["i"]
         j_nn = ji["j"]
@@ -226,7 +269,7 @@ class NNSampler(ObsSampler):
         return i_nn, j_nn
 
 
-    def find_nearest_time(self, ds, profile, thresh=10):
+    def find_nearest_time(self, ds, profile):
         """
         Turn observation time into model time index
 
@@ -236,8 +279,6 @@ class NNSampler(ObsSampler):
             Gridded ocean model dataset.
         profile : xarray.Dataset 
             observation profile dataset
-        thresh : int 
-            threshold in model timesteps for a profile being out of time bounds
 
         Return
         index: indicies of model in time

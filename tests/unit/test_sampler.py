@@ -269,8 +269,40 @@ def test_sampler_time_subset(synthetic_ds):
     sampler = NNSampler()
     model_t = sampler.sample(synthetic_ds, profile)
     
-    assert (model_t.votemper.sel(profile_id=1) 
+    assert ((model_t.votemper.sel(profile_id=1) 
             == synthetic_ds.votemper[5, :, 6, 8]).all()
+            & (model_t.sizes['profile_id'] == 1))
+
+
+def test_sampler_space_subset(synthetic_ds):
+    """
+    Tests for extracting profiles where some are outside model ocean bounds.
+    """
+    # Synthetic profile
+    synth_domain = synthetic_ds
+    synth_domain['votemper'] = synth_domain['votemper'].where(synth_domain.lon >= 5)
+
+    prof_id = np.array([0, 1])
+    profile_lon = np.array([3, 8])
+    profile_lat = np.array([5, 6])
+    profile_time = np.array([dt.datetime(2020, 5, 10), dt.datetime(2020, 5, 6)])
+    profile = xr.Dataset(
+        {
+            "lon": (("profile_id"), profile_lon),
+            "lat": (("profile_id"), profile_lat),
+            "time": (("profile_id"), profile_time)
+        },
+        coords={
+            "profile_id": prof_id,
+        },
+    )
+
+    sampler = NNSampler()
+    model_t = sampler.sample(synthetic_ds, profile)
+    
+    assert ((model_t.votemper.sel(profile_id=1) 
+            == synthetic_ds.votemper[5, :, 6, 8]).all()
+            & (model_t.sizes['profile_id'] == 1))
 
 
 @pytest.fixture

@@ -27,6 +27,8 @@ netCDF4 = "*"
 typer = ">=0.24.1,<0.25"
 xarray = "*"
 zarr = "*"
+xoak = "*"
+scikit-learn = "*"
 git = "*" # needed for dynamic versioning
 
 [dependencies]

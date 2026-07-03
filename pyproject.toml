@@ -26,6 +26,8 @@ dependencies = [
   "typer",
   "xarray",
   "zarr",
+  "xoak",
+  "scikit-learn"
   ]
 
 [project.optional-dependencies]

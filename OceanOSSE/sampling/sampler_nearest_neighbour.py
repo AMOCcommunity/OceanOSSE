@@ -95,8 +95,8 @@ class NNSampler(ObsSampler):
             ds_synth = self.extract_locations_ij(ds, i_nn, j_nn, t_nn)
         
         else:
-            ds = self.find_nearest_geoball(ds)
-            ds_synth = self.extract_locations_geoball(ds, profile)
+            ds, valid = self.find_nearest_geoball(ds)
+            ds_synth = self.extract_locations_geoball(ds, valid, profile)
         
         return ds_synth
     
@@ -340,17 +340,43 @@ class NNSampler(ObsSampler):
         self.lat_name = 'lat'
         self.lon_name = 'lon'
         self.time_name = 'time'
-        ds = (ds.assign_coords({
-                self.lat_name: ds[self.lat_name], 
-                self.lon_name: ds[self.lon_name],
-                self.time_name: ds[self.time_name]}).set_xindex(
+
+        # Mask lat and lon where land is present
+        mask = xr.DataArray(ds.votemper.isel({"d": 0, "t": 0}).notnull())
+        ds = ds.set_coords(["lat", "lon", "time"])
+
+        # Collapse the horizontal grid to an irregular point dimension.
+        # create_index=False avoids creating a pandas MultiIndex from j and i.
+        ds_points = ds.stack(point=("j", "i"), create_index=False)
+
+        # Stack the mask in exactly the same order.
+        valid_points = mask.stack(point=("j", "i"), create_index=False)
+
+        # Remove mask == 0 points.
+        ds_points = ds_points.isel(point=valid_points.data.astype(bool))
+
+        ds_points = (ds_points.assign_coords({
+                self.lat_name: ds_points[self.lat_name], 
+                self.lon_name: ds_points[self.lon_name],
+                self.time_name: ds_points[self.time_name]}).set_xindex(
                 (self.lat_name, self.lon_name), 
                 NDPointIndex, 
                 tree_adapter_cls=SklearnGeoBallTreeAdapter))
 
-        return ds
+        valid_points = (
+            ds[["lat", "lon"]]
+            .assign(valid=mask)
+            .stack(point=("j", "i"), create_index=False)
+            .set_xindex(
+                ("lat", "lon"),
+                NDPointIndex,
+                tree_adapter_cls=SklearnGeoBallTreeAdapter,
+            )
+        )
 
-    def extract_locations_geoball(self, ds, profile):
+        return ds_points, valid_points
+
+    def extract_locations_geoball(self, ds, valid_points, profile):
         """
         Extract a model profile at the obs profile lat and lon.
 
@@ -367,13 +393,31 @@ class NNSampler(ObsSampler):
         self.prof_lat_name = 'lat'
         self.prof_lon_name = 'lon'
         self.prof_time_name = 'time'
+
+        # Check where profiles fall on the grid and if they're valid
+        nearest_cells = valid_points.sel({
+            self.lat_name: profile[self.prof_lat_name], 
+            self.lon_name: profile[self.prof_lon_name]},
+            method="nearest",
+        )
+        target_is_valid = nearest_cells["valid"].astype(bool)
+
+        # Get nearest point to profile
         ds_model_profile = ds.sel({
             self.time_name: profile[self.prof_time_name],
             self.lat_name: profile[self.prof_lat_name], 
             self.lon_name: profile[self.prof_lon_name]}, 
             method='nearest')
 
-        ds_model_profile = ds_model_profile.assign_coords(profile_id=profile["profile_id"])
+        ds_model_profile = ds_model_profile.assign_coords(profile_id=profile['profile_id'])
+
+        discard = True
+        if discard:
+            # Remove profiles not in sea
+            ds_model_profile = ds_model_profile.isel(
+                profile_id=np.flatnonzero(target_is_valid.values)
+            )
+
         ds_model_profile = ds_model_profile.reset_coords(['lat', 'lon', 'time'])
       
         return ds_model_profile

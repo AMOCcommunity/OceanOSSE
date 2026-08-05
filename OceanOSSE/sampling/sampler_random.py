@@ -84,25 +84,36 @@ class RandomSampler(ObsSampler):
         xarray.Dataset
             Sampled synthetic observations dataset.
         """
-        if prob != None:
+        if prob is not None:
             prob = prob.interp_like(ds, method="linear")
         
         # from config
-        n_sample = 100
+        from_config = False
+        if from_config:
+            None
+            # load n_samples from config
+        else:
+            # for tests
+            n_sample = 100
         
-        t_index = np.zeros((ds['t'].size * n_sample))
-        i_index = np.zeros((ds['t'].size * n_sample))
-        j_index = np.zeros((ds['t'].size * n_sample))
+        t_index = np.zeros((ds['t'].size * n_sample), dtype=int)
+        i_index = np.zeros((ds['t'].size * n_sample), dtype=int)
+        j_index = np.zeros((ds['t'].size * n_sample), dtype=int)
         for t in range(ds['t'].size):
             st_i = t * n_sample
             en_i = (t + 1) * n_sample
             t_index[st_i:en_i] = t
-            i_prob, j_prob = random_sample(ds, n_sample, prob=prob)
+            i_prob, j_prob = self.random_sample(ds, n_sample, prob=prob)
             i_index[st_i:en_i] = i_prob
             j_index[st_i:en_i] = j_prob
-            
-        ds_synth = self.extract_locations_ij(ds, i_index, j_index, t_index)
         
+        prof_id = xr.DataArray(np.arange(n_sample * ds['t'].size), dims="profile_id")
+        i_index = xr.DataArray(i_index, dims="profile_id", coords={"profile_id": prof_id})
+        j_index = xr.DataArray(j_index, dims="profile_id", coords={"profile_id": prof_id})
+        t_index = xr.DataArray(t_index, dims="profile_id", coords={"profile_id": prof_id})
+
+        ds_synth = self.extract_locations_ij(ds, i_index, j_index, t_index)
+
         return ds_synth
     
     
@@ -131,7 +142,7 @@ class RandomSampler(ObsSampler):
         return ds
     
     
-    def sample(self, ds: xr.Dataset, profile: xr.Dataset, ij=True) -> xr.Dataset:
+    def sample(self, ds: xr.Dataset, prob: Optional[xr.DataArray] = None) -> xr.Dataset:
         """
         Perform sampling pipeline for chosen ocean observing platform.
         
@@ -139,7 +150,8 @@ class RandomSampler(ObsSampler):
         ----------
         ds : xarray.Dataset
             Gridded ocean model dataset.
-        profile : xarray.Dataset observation profile dataset
+        prob : xarray.Dataset 
+            Loaded probability distribution.
 
         Returns
         -------
@@ -147,7 +159,7 @@ class RandomSampler(ObsSampler):
             Synthetic observations dataset with errors applied.
         """
         # -- Sample the gridded ocean model output -- #
-        ds_sampled = self.collect_samples(ds, profile, ij)
+        ds_sampled = self.collect_samples(ds, prob)
         logging.info(
             "--> Completed: Collected samples from ocean model dataset using ObsSampler."
         )
@@ -158,7 +170,7 @@ class RandomSampler(ObsSampler):
         return ds_obs
 
     
-    def random_sample(ds, n_sample, prob=None):
+    def random_sample(self, ds, n_sample, prob=None):
         """
         Take a random set of profiles in the model domain. 
         If probability is given take a semi-random set of profiles 
@@ -179,29 +191,28 @@ class RandomSampler(ObsSampler):
         """
            
         sizes = ds.sizes
-        print(sizes)
-        mask = ds.mask
+
+        mask = xr.DataArray(ds.votemper.isel({"d": 0, "t": 0}).notnull())
         rng = np.random.default_rng()
         
-        i_index = np.array([])
-        j_index = np.array([])
+        i_index = np.array([], dtype=int)
+        j_index = np.array([], dtype=int)
 
         while len(i_index) < n_sample:
             get_sample = n_sample - len(i_index)
-            if prob != None:
-                flat_idx = np.random.choice(mask.size, size=get_sample, p=prob.ravel())
+            if prob is not None:
+                flat_idx = np.random.choice(mask.size, size=get_sample, p=prob.values.ravel())
             else:
                 flat_idx = np.random.choice(mask.size, size=get_sample)
+                
             j_random, i_random = np.unravel_index(flat_idx, mask.shape)
-            #i_random = rng.integers(low=0, high=10, size=get_sample) 
-            #j_random = rng.integers(low=0, high=10, size=get_sample)
-            sel_bool = mask[i_random, j_random]
+            sel_bool = mask.values[j_random, i_random]
             i_index = np.append(i_index, i_random[sel_bool])
             j_index = np.append(j_index, j_random[sel_bool])
             
         i_index = i_index[:n_sample]
         j_index = j_index[:n_sample]
-        
+
         return i_index, j_index
 
     

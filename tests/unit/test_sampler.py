@@ -272,6 +272,43 @@ def test_sampler_time_subset(synthetic_ds):
     assert (model_t.votemper.sel(profile_id=1) 
             == synthetic_ds.votemper[5, :, 6, 8]).all()
 
+
+def test_random_coords(synthetic_ds):
+    """
+    Tests sampler for fully random locations produces the right style output.
+    """
+    # Synthetic domain
+    synth_domain = synthetic_ds
+    synth_domain1 = synth_domain.isel(t=slice(0, 12))
+   
+    sampler = RandomSampler()
+    model_t = sampler.sample(synth_domain1)
+    
+    assert ((set(model_t.dims) == {'d', 'profile_id'}) 
+        & (set(model_t.coords) == {'d', 'profile_id', 'i', 'j', 't'}))
+    
+def test_prob_coords(synthetic_ds):
+    """
+    Tests sampler for probability produces the right style output.
+    """
+    # Synthetic domain
+    synth_domain = synthetic_ds
+    synth_domain1 = synth_domain.isel(t=slice(0, 12))
+    
+    ny = synth_domain1.sizes["j"]
+    nx = synth_domain1.sizes["i"]
+    prob = np.ones((ny, nx))
+    probability = xr.DataArray(
+        prob, dims=("j", "i"), coords={"j": synth_domain1.j, "i": synth_domain1.i}
+        )
+    probability = probability / probability.sum()
+    
+    sampler = RandomSampler()
+    model_t = sampler.sample(synth_domain1, prob=probability)
+    
+    assert ((set(model_t.dims) == {'d', 'profile_id'}) 
+        & (set(model_t.coords) == {'d', 'profile_id', 'i', 'j', 't'}))
+    
     
 def test_random(synthetic_ds):
     """

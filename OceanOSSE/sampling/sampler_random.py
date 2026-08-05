@@ -86,11 +86,13 @@ class RandomSampler(ObsSampler):
         """
         if prob is not None:
             prob = prob.interp_like(ds, method="linear")
+            prob = prob / prob.sum()
         
         # from config
-        from_config = False
-        if from_config:
+        from_cf = False
+        if from_cf:
             None
+            n_samples = self.n_samples
             # load n_samples from config
         else:
             # for tests

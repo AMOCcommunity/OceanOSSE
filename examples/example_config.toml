@@ -6,6 +6,25 @@
 #   OceanOSSE run examples/example_config.toml --dry-run
 # ============================================================
 
+# ========================== Domain ==========================
+[domain]
+data_dir = "/path/to/nemo/output"
+format = "netcdf"
+
+[domain.dimensions]
+lev  = "nav_lev"
+j    = "y"
+i    = "x"
+
+[domain.coordinates]
+depth = "nav_lev"
+lon = "nav_lon"
+lat = "nav_lat"
+
+[domain.variables.mask]
+path = "/dssgfs01/scratch/npd/simulations/eORCA1_ERA5_v1/eORCA1_ERA5_1m_grid_T_202312-202312.nc"
+open_kwargs = { engine = "netcdf4" }
+
 # ========================== Inputs ==========================
 [inputs]
 data_dir = "/path/to/nemo/output"
@@ -31,6 +50,31 @@ open_kwargs = { engine = "netcdf4" }
 path = "/dssgfs01/scratch/npd/simulations/eORCA1_ERA5_v1/eORCA1_ERA5_1m_grid_T_202312-202312.nc"
 open_kwargs = { engine = "netcdf4" }
 
+# ========================== Climatology ==========================
+[climatology]
+data_dir = "/path/to/nemo/output"
+format = "netcdf"
+
+[climatology.dimensions]
+month = "month"
+lev  = "deptht"
+j    = "y"
+i    = "x"
+
+[climatology.coordinates]
+month = "month"
+depth = "deptht"
+lon = "nav_lon"
+lat = "nav_lat"
+
+[climatology.variables.thetao_con]
+path = "/dssgfs01/scratch/npd/simulations/eORCA1_ERA5_v1/eORCA1_ERA5_1m_grid_T_202312-202312.nc"
+open_kwargs = { engine = "netcdf4" }
+
+[climatology.variables.so_abs]
+path = "/dssgfs01/scratch/npd/simulations/eORCA1_ERA5_v1/eORCA1_ERA5_1m_grid_T_202312-202312.nc"
+open_kwargs = { engine = "netcdf4" }
+
 # ========================== Sampling ==========================
 [sampling]
 name = "test"
@@ -42,7 +86,8 @@ kwargs = { sigma = 1.0 }
 # ========================== Regridding ==========================
 [regridding]
 name = "test"
-kwargs = { method = "nearest_s2d" }
+mask_name = "mask"
+kwargs = { radius = 5 }
 
 # ========================== Outputs ==========================
 [outputs]

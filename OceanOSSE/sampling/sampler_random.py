@@ -66,6 +66,7 @@ class RandomSampler(ObsSampler):
         self
             Initialised ObsSampler instance.
         """
+        #self.n_samples = config["sampling"]["kwargs"]["n_samples"]
         
         return self
     

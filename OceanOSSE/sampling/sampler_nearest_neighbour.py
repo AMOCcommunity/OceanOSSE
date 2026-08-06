@@ -195,13 +195,13 @@ class NNSampler(ObsSampler):
         ds : xarray.Dataset
             Gridded ocean model dataset.
         ji : xarray.Dataset 
-            indicies of profile dataset
+            indices of profile dataset
         score : xarray.DataArray
             distance score of profiles from grid points
 
         Return
         xarray.Dataset
-            indicies of profile dataset
+            indices of profile dataset
         """
         n_total = ji.profile_id.size
 
@@ -238,7 +238,7 @@ class NNSampler(ObsSampler):
         profile : xarray.Dataset observation profile dataset
 
         Return
-        index: indicies of model in i and j
+        index: indices of model in i and j
         """
 
         lon_sub = np.abs(ds.lon - profile.lon)
@@ -281,7 +281,7 @@ class NNSampler(ObsSampler):
             observation profile dataset
 
         Return
-        index: indicies of model in time
+        index: indices of model in time
         """
         # Time difference in microsec
         time_delta = np.abs(ds.time - profile.time)
@@ -334,7 +334,7 @@ class NNSampler(ObsSampler):
             Gridded ocean model dataset.
 
         Return
-        index: indicies of model in i an j
+        index: indices of model in i an j
         """
 
         self.lat_name = 'lat'

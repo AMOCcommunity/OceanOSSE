@@ -1,7 +1,27 @@
-import numpy as np
 import gsw
+import numpy as np
 
-def convective_adjustment(SA, CT, p, h):
+
+def convective_adjustment(SA, CT, p, h, dim="deptht"):
+    """Apply convective adjustment along a depth dimension."""
+
+    SA_out, CT_out = xr.apply_ufunc(
+        _convective_adjustment,
+        SA,
+        CT,
+        p,
+        h,
+        input_core_dims=[[dim], [dim], [dim], [dim]],
+        output_core_dims=[[dim], [dim]],
+        dask="parallelized",
+        vectorize=True,
+        output_dtypes=[SA.dtype, CT.dtype],
+    )
+
+    return SA_out, CT_out
+
+
+def _convective_adjustment(SA, CT, p, h):
     """
     Fully convectively mix an unstable water column.
 
@@ -18,8 +38,8 @@ def convective_adjustment(SA, CT, p, h):
     """
     SA = np.asarray(SA, dtype=np.float64)
     CT = np.asarray(CT, dtype=np.float64)
-    p  = np.asarray(p,  dtype=np.float64)
-    h  = np.asarray(h,  dtype=np.float64)
+    p = np.asarray(p, dtype=np.float64)
+    h = np.asarray(h, dtype=np.float64)
 
     SA_out = np.full_like(SA, np.nan)
     CT_out = np.full_like(CT, np.nan)
@@ -29,9 +49,9 @@ def convective_adjustment(SA, CT, p, h):
 
     SA = SA[:nwet]
     CT = CT[:nwet]
-    p  = p[:nwet]
-    h  = h[:nwet]
-    
+    p = p[:nwet]
+    h = h[:nwet]
+
     assert SA.ndim == 1
     assert CT.ndim == 1
     assert p.ndim == 1
@@ -73,9 +93,11 @@ def convective_adjustment(SA, CT, p, h):
             p_interface = p[top_lower]
 
             # Fast evaluation using a single call with 2 elements
-            rhos = gsw.density.rho([salt_upper / h_upper, salt_lower / h_lower],
-                                   [heat_upper / h_upper, heat_lower / h_lower],
-                                   p_interface)
+            rhos = gsw.density.rho(
+                [salt_upper / h_upper, salt_lower / h_lower],
+                [heat_upper / h_upper, heat_lower / h_lower],
+                p_interface,
+            )
             rho_upper = rhos[0]
             rho_lower = rhos[1]
 
@@ -104,11 +126,10 @@ def convective_adjustment(SA, CT, p, h):
         SA_mix = stack_salt[i] / stack_h[i]
         CT_mix = stack_heat[i] / stack_h[i]
 
-        SA_new[top:bottom+1] = SA_mix
-        CT_new[top:bottom+1] = CT_mix
+        SA_new[top : bottom + 1] = SA_mix
+        CT_new[top : bottom + 1] = CT_mix
 
     SA_out[:nwet] = SA_new
     CT_out[:nwet] = CT_new
 
     return SA_out, CT_out
-

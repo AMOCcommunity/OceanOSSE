@@ -2,7 +2,7 @@ import gsw
 import numpy as np
 import xarray as xr
 
-from your_module import (
+from OceanOSSE.gridding.convective_adjustment import (
     _convective_adjustment,
     convective_adjustment,
 )

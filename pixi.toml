@@ -36,6 +36,7 @@ git = "*" # needed for dynamic versioning
 OceanOSSE = { path = "." }
 python = "3.13.*"
 pydantic = ">=2.13.3,<3"
+pyinterp = ">=2026.7.0,<2027"
 
 # === Features === #
 
@@ -47,11 +48,14 @@ matplotlib = "*"
 cartopy = "*"
 nc-time-axis = "*"
 polars = ">=1.39.3,<2"
+tqdm = ">=4.68.3,<5"
+pyinterp = ">=2026.7.0,<2027"
 
 [feature.dev.pypi-dependencies]
 ruff = "*"
 pytest = "*"
 pytest-mock = "*"
+pyinterp = ">=2026.7.0, <2027"
 
 [feature.docs.pypi-dependencies]
 # Additional dependencies for OceanOSSE documentation environment:

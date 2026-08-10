@@ -23,6 +23,8 @@ dependencies = [
   "dask",
   "netcdf4",
   "pydantic",
+  "pyinterp",
+  "tqdm",
   "typer",
   "xarray",
   "zarr",

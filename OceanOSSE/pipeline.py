@@ -9,7 +9,9 @@ Created By: Ollie Tooth (oliver.tooth@noc.ac.uk)
 # -- Import Dependencies -- #
 import logging
 
-from OceanOSSE.gridding.regridder import MockRegridder, Regridder
+import xarray as xr
+
+from OceanOSSE.gridding.regridder import IDWRegridder, MockRegridder, Regridder
 from OceanOSSE.io.dataloader import DataLoader, NetCDFDataLoader
 from OceanOSSE.io.datawriter import DataWriter, NetCDFDataWriter
 from OceanOSSE.sampling.sampler import MockObsSampler, ObsSampler
@@ -22,7 +24,7 @@ _DATA_LOADER_REGISTRY: dict[str, type[DataLoader]] = {"netcdf": NetCDFDataLoader
 
 _OBS_SAMPLER_REGISTRY: dict[str, type[ObsSampler]] = {"test": MockObsSampler}
 
-_REGRIDDER_REGISTRY: dict[str, type[Regridder]] = {"test": MockRegridder}
+_REGRIDDER_REGISTRY: dict[str, type[Regridder]] = {"test": MockRegridder, "idw": IDWRegridder}
 
 _DATA_WRITER_REGISTRY: dict[str, type[DataWriter]] = {"netcdf": NetCDFDataWriter}
 
@@ -241,11 +243,20 @@ def run_pipeline(args: dict) -> None:
     config = load_config(config_path=args["config_file"])
     logger.info(f"Completed: Read & validated config file -> {args['config_file']}")
 
+    # Load ocean model domain using DataLoader:
+    data_loader = _create_DataLoader(config=config, table="domain")
+    logger.info(f"In Progress: Loading ocean input model domain using {data_loader}...")
+    ds_domain = data_loader.load_data()
+    logger.info("Completed: Loaded ocean model input domain dataset.")
+
     # Load ocean model dataset using DataLoader:
     data_loader = _create_DataLoader(config=config, table="inputs")
     logger.info(f"In Progress: Loading ocean input model dataset using {data_loader}...")
     ds_mdl = data_loader.load_data()
     logger.info("Completed: Loaded ocean model input dataset.")
+
+    # Merge ocean model domain & variable datasets:
+    ds_mdl = xr.merge([ds_mdl, ds_domain])
 
     if config["climatology"].get("read_climatology", False):
         # Calculate monthly climatology from model dataset:
@@ -276,7 +287,7 @@ def run_pipeline(args: dict) -> None:
     logger.info(
         f"In Progress: Sampling synthetic ocean observations using {obs_sampler}..."
     )
-    ds_obs = obs_sampler.sample(ds=ds_mdl)
+    ds_obs = obs_sampler.sample(ds_mdl=ds_mdl)
 
     # === Regridding === #
     logger.info("==== Regridding ====")
@@ -285,7 +296,7 @@ def run_pipeline(args: dict) -> None:
     logger.info(
         f"In Progress: Regridding synthetic ocean observations using {regridder}..."
     )
-    ds_regridded = regridder.regrid(ds=ds_obs)
+    ds_regridded = regridder.regrid(ds_obs=ds_obs, ds_mdl=ds_mdl, ds_clim=ds_clim)
 
     # === Outputs === #
     logger.info("==== Outputs ====")
@@ -295,7 +306,7 @@ def run_pipeline(args: dict) -> None:
     output_filepath = data_writer.write_data(ds=ds_regridded)
     logger.info(f"Completed: Written output dataset to file: {output_filepath}")
     # Close all files:
-    for ds in [ds_mdl, ds_obs, ds_regridded]:
+    for ds in [ds_domain, ds_mdl, ds_obs, ds_regridded, ds_clim]:
         ds.close()
     logger.info("--> Completed: Closed all dataset files.")
 
@@ -321,9 +332,24 @@ def describe_pipeline(args: dict) -> str:
     logger.info(f"Completed: Read & validated config file -> {args['config_file']}")
 
     # Load ocean model dataset using DataLoader:
-    data_loader = _create_DataLoader(config=config)
+    data_loader = _create_DataLoader(config=config, table="domain")
+    logger.info("Action: Load ocean model domain using...")
+    logger.info("* DataLoader   : %r", data_loader)
+
+    # Load ocean model dataset using DataLoader:
+    data_loader = _create_DataLoader(config=config, table="inputs")
     logger.info("Action: Load ocean model dataset using...")
     logger.info("* DataLoader   : %r", data_loader)
+
+    if config["climatology"].get("read_climatology", False):
+        # Calculate monthly climatology from model dataset:
+        logger.info("Action: Calculate monthly climatology from model input dataset using...")
+        logger.info("* DataLoader   : %r", data_loader)
+    else:
+        # Load monthly climatology from file:
+        clim_loader = _create_DataLoader(config=config, table="climatology")
+        logger.info("Action: Load monthly climatology from file using...")
+        logger.info("* DataLoader   : %r", clim_loader)
 
     # === Sampling === #
     logger.info("==== Sampling ====")

@@ -44,7 +44,7 @@ class DataLoader(abc.ABC):
     _coordinates : dict[str, str]
         Mapping of standard coordinate names to input dataset coordinate names.
     _table : str
-        Name of the table in the .toml configuration file. Options are 'inputs'
+        Name of the table in the .toml configuration file. Options are 'domain', 'inputs'
         or 'climatology'. Default is 'inputs'.
     """
 
@@ -96,7 +96,7 @@ class DataLoader(abc.ABC):
             Configuration dictionary containing input parameters from .toml
             configuration file.
         table : str
-            Name of the table in the .toml configuration file. Options are
+            Name of the table in the .toml configuration file. Options are 'domain',
             'inputs' or 'climatology'. Default is 'inputs'.
 
         Returns
@@ -144,8 +144,8 @@ class DataLoader(abc.ABC):
             dims=('month', 'bnds'),
             coords={'month': ds_clim['month']},
         )
-        ds_clim['time_bnds'].data[:, 0] = (np.datetime64(f'{start_yr}-01', 'M') + (np.timedelta64(1, 'M') * np.arange(ds['time'].size))).astype('datetime64[ns]')
-        ds_clim['time_bnds'].data[:, 1] = (np.datetime64(f'{end_yr}-01', 'M') + (np.timedelta64(1, 'M') * np.arange(ds['time'].size))).astype('datetime64[ns]')
+        ds_clim['time_bnds'].data[:, 0] = (np.datetime64(f'{start_yr}-01', 'M') + (np.timedelta64(1, 'M') * np.arange(ds_clim['month'].size))).astype('datetime64[ns]')
+        ds_clim['time_bnds'].data[:, 1] = (np.datetime64(f'{end_yr}-01', 'M') + (np.timedelta64(1, 'M') * np.arange(ds_clim['month'].size))).astype('datetime64[ns]')
 
         return ds_clim
 
@@ -191,7 +191,9 @@ class DataLoader(abc.ABC):
             If the dataset does not contain the required variables or dimensions.
         """
         # -- Validate Required Dimensions -- #
-        if self._table == "climatology":
+        if self._table == "domain":
+            required_dims = ["lev", "j", "i"]
+        elif self._table == "climatology":
             required_dims = ["month", "lev", "j", "i"]
         else:
             required_dims = ["time", "lev", "j", "i"]
@@ -203,7 +205,9 @@ class DataLoader(abc.ABC):
             )
 
         # -- Validate Required Coordinates -- #
-        if self._table == "climatology":
+        if self._table == "domain":
+            required_coords = ["depth", "lat", "lon"]
+        elif self._table == "climatology":
             required_coords = ["month", "depth", "lat", "lon"]
         else:
             required_coords = ["time", "depth", "lat", "lon"]
@@ -251,7 +255,7 @@ class NetCDFDataLoader(DataLoader):
             Configuration dictionary.
         table : str, optional
             Name of the table in the .toml configuration file.
-            Options are 'inputs' or 'climatology'. Default is 'inputs'.
+            Options are 'domain', 'inputs' or 'climatology'. Default is 'inputs'.
 
         Returns
         -------
@@ -263,9 +267,9 @@ class NetCDFDataLoader(DataLoader):
             raise TypeError("config must be a dictionary.")
         if not isinstance(table, str):
             raise TypeError("table must be a string.")
-        if table not in ["inputs", "climatology"]:
+        if table not in ["domain", "inputs", "climatology"]:
             raise ValueError(
-                "table must be either 'inputs' or 'climatology'."
+                "table must be either 'domain', 'inputs' or 'climatology'."
             )
 
         # -- Instantiate DataLoader with source dict from config -- #

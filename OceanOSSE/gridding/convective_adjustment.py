@@ -2,7 +2,7 @@ import gsw
 import numpy as np
 
 
-def convective_adjustment(SA, CT, p, h, dim="deptht"):
+def convective_adjustment(SA, CT, p, h, dim="lev"):
     """Apply convective adjustment along a depth dimension."""
 
     SA_out, CT_out = xr.apply_ufunc(

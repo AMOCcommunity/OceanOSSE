@@ -87,26 +87,32 @@ def test_partially_unstable_column():
     """
 
     # First construct a known stable column.
-    SA = np.array([
-        35.0,
-        35.0,
-        35.0,
-        35.0,
-    ])
+    SA = np.array(
+        [
+            35.0,
+            35.0,
+            35.0,
+            35.0,
+        ]
+    )
 
-    CT = np.array([
-        15.0,
-        10.0,
-        5.0,
-        0.0,
-    ])
+    CT = np.array(
+        [
+            15.0,
+            10.0,
+            5.0,
+            0.0,
+        ]
+    )
 
-    p = np.array([
-        0.0,
-        100.0,
-        200.0,
-        300.0,
-    ])
+    p = np.array(
+        [
+            0.0,
+            100.0,
+            200.0,
+            300.0,
+        ]
+    )
 
     h = np.full(4, 100.0)
 
@@ -114,7 +120,7 @@ def test_partially_unstable_column():
 
     # Make the middle two layers unstable by making the
     # third layer substantially warmer.
-    CT[2] = 12.0
+    CT[2] = 15.0
 
     assert not is_stable(SA, CT, p)
 
@@ -148,37 +154,45 @@ def test_partially_unstable_column():
 def test_nan_padding_is_preserved():
     """NaN values below the wet column should remain NaN."""
 
-    SA = np.array([
-        35.0,
-        35.0,
-        35.0,
-        np.nan,
-        np.nan,
-    ])
+    SA = np.array(
+        [
+            35.0,
+            35.0,
+            35.0,
+            np.nan,
+            np.nan,
+        ]
+    )
 
-    CT = np.array([
-        15.0,
-        10.0,
-        5.0,
-        np.nan,
-        np.nan,
-    ])
+    CT = np.array(
+        [
+            15.0,
+            10.0,
+            5.0,
+            np.nan,
+            np.nan,
+        ]
+    )
 
-    p = np.array([
-        0.0,
-        100.0,
-        200.0,
-        300.0,
-        400.0,
-    ])
+    p = np.array(
+        [
+            0.0,
+            100.0,
+            200.0,
+            300.0,
+            400.0,
+        ]
+    )
 
-    h = np.array([
-        100.0,
-        100.0,
-        100.0,
-        100.0,
-        100.0,
-    ])
+    h = np.array(
+        [
+            100.0,
+            100.0,
+            100.0,
+            100.0,
+            100.0,
+        ]
+    )
 
     SA_new, CT_new = _convective_adjustment(SA, CT, p, h)
 
@@ -197,10 +211,12 @@ def test_variable_layer_thickness():
 
     p = np.array([0.0, 100.0])
 
-    h = np.array([
-        100.0,
-        300.0,
-    ])
+    h = np.array(
+        [
+            100.0,
+            300.0,
+        ]
+    )
 
     assert not is_stable(SA, CT, p)
 

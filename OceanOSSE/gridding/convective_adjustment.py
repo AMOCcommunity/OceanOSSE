@@ -1,5 +1,6 @@
 import gsw
 import numpy as np
+import xarray as xr
 
 
 def convective_adjustment(SA, CT, p, h, dim="lev"):

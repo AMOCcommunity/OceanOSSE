@@ -21,6 +21,7 @@ requires-python = ">=3.12"
 dependencies = [
   "cftime",
   "dask",
+  "gsw",
   "netcdf4",
   "pydantic",
   "pyinterp",

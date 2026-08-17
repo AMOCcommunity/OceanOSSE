@@ -86,9 +86,6 @@ class RandomSampler(ObsSampler):
         xarray.Dataset
             Sampled synthetic observations dataset.
         """
-        if prob is not None:
-            prob = prob.interp_like(ds, method="linear")
-            prob = prob / prob.sum()
         
         # from config
         from_cf = False
@@ -196,29 +193,21 @@ class RandomSampler(ObsSampler):
            
         sizes = ds.sizes
 
-        mask = xr.DataArray(ds.votemper.isel({"d": 0, "t": 0}).notnull())
-        rng = np.random.default_rng()
-        
-        i_index = np.array([], dtype=int)
-        j_index = np.array([], dtype=int)
-
-        while len(i_index) < n_sample:
-            get_sample = n_sample - len(i_index)
-            if prob is not None:
-                flat_idx = np.random.choice(mask.size, size=get_sample, p=prob.values.ravel())
-            else:
-                flat_idx = np.random.choice(mask.size, size=get_sample)
-                
-            j_random, i_random = np.unravel_index(flat_idx, mask.shape)
-            sel_bool = mask.values[j_random, i_random]
-            i_index = np.append(i_index, i_random[sel_bool])
-            j_index = np.append(j_index, j_random[sel_bool])
+        # surface layer: 0 land, 1 sea
+        mask = ds.mask.isel({"lev": 0})
+                            
+        if prob is not None:
+            # change provided probability to zero where land is present
+            prob = prob.where(mask).fillna(0)
+        else:
+            # make a probability map where land is zero
+            prob = xr.ones_like(mask).where(mask == 1).fillna(0)
             
-        i_index = i_index[:n_sample]
-        j_index = j_index[:n_sample]
+        # normalise the probabilities to make them sum to 1.
+        prob = prob / prob.sum()
 
-        return i_index, j_index
-
-
-
+        flat_idx = np.random.choice(mask.size, size=n_sample, p=prob.values.ravel())
+        j_random, i_random = np.unravel_index(flat_idx, mask.shape)
+        
+        return i_random, j_random
 

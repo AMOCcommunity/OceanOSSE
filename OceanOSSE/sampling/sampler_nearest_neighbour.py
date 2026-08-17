@@ -32,6 +32,7 @@ from xoak import SklearnGeoBallTreeAdapter
 
 from OceanOSSE.utils import import_class
 from OceanOSSE.sampling.sampler import ErrorKernel, ObsSampler
+from OceanOSSE.sampling.utilities import extract_locations_ij
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +92,7 @@ class NNSampler(ObsSampler):
         if ij:
             t_nn = self.find_nearest_time(ds, profile)
             i_nn, j_nn = self.find_nearest_ij(ds, profile)
-            ds_synth = self.extract_locations_ij(ds, i_nn, j_nn, t_nn)
+            ds_synth = extract_locations_ij(ds, i_nn, j_nn, t_nn)
         
         else:
             ds = self.find_nearest_geoball(ds)
@@ -259,28 +260,6 @@ class NNSampler(ObsSampler):
                 raise ValueError("Profile time is outside model time bounds.")
         
         return t_nn
-
-    
-    def extract_locations_ij(self, ds, i_index, j_index, t_index):
-        """
-        Extract a model profile at the specified model index.
-
-        Parameters
-        ----------
-        ds : xarray.Dataset
-            Gridded ocean model dataset.
-        i_index : observation index on model grid in i direction
-        j_index : observation index on model grid in j direction
-        t_index : observation index in time
-
-        Return
-        xarray.Dataset
-            Model profile dataset
-        """
-
-        ds_model_profile = ds.isel(i=i_index, j=j_index, t=t_index)
-        
-        return ds_model_profile
         
 
     def find_nearest_geoball(self, ds):

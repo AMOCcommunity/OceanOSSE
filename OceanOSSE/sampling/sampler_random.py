@@ -30,6 +30,7 @@ import numpy as np
 
 from OceanOSSE.utils import import_class
 from OceanOSSE.sampling.sampler import ErrorKernel, ObsSampler
+from OceanOSSE.sampling.utilities import extract_locations_ij
 
 logger = logging.getLogger(__name__)
 
@@ -115,7 +116,7 @@ class RandomSampler(ObsSampler):
         j_index = xr.DataArray(j_index, dims="profile_id", coords={"profile_id": prof_id})
         t_index = xr.DataArray(t_index, dims="profile_id", coords={"profile_id": prof_id})
 
-        ds_synth = self.extract_locations_ij(ds, i_index, j_index, t_index)
+        ds_synth = extract_locations_ij(ds, i_index, j_index, t_index)
 
         return ds_synth
     
@@ -218,28 +219,6 @@ class RandomSampler(ObsSampler):
 
         return i_index, j_index
 
-    
-    def extract_locations_ij(self, ds, i_index, j_index, t_index):
-        """
-        Extract a model profile at the specified model index.
-
-        Parameters
-        ----------
-        ds : xarray.Dataset
-            Gridded ocean model dataset.
-        i_index : observation index on model grid in i direction
-        j_index : observation index on model grid in j direction
-        t_index : observation index in time
-
-        Return
-        xarray.Dataset
-            Model profile dataset
-        """
-
-        ds_model_profile = ds.isel(i=i_index, j=j_index, t=t_index)
-        
-        return ds_model_profile
-        
 
 
 

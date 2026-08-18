@@ -86,8 +86,8 @@ class NNSampler(ObsSampler):
         xarray.Dataset
             Sampled synthetic observations dataset.
         """
-        profile = self.time_bounds(ds, profile)
-
+        self.time_bounds(ds, profile)
+        
         if ij:
             t_nn = self.find_nearest_time(ds, profile)
             i_nn, j_nn = self.find_nearest_ij(ds, profile)
@@ -175,15 +175,13 @@ class NNSampler(ObsSampler):
         t_index = (p_time >= st_date) & (p_time <= en_date)
         n_reject = np.sum(np.invert(t_index).astype(int))
         n_total = profile.time.size
-        logging.info('Profiles rejected for being outside time bounds: {:.2f}'.format((n_reject / n_total) * 100))
-        print('Profiles rejected for being outside time bounds: {:.2f}%'.format((n_reject / n_total) * 100))
-        if n_reject / n_total == 1:
-            raise ValueError("All profiles outside model time bounds.")
-        
-        t_xa = xr.DataArray(t_index, coords={"profile_id": profile.coords['profile_id']})
-        profile = profile.where(t_xa, drop=True)
 
-        return profile
+        if n_reject >= 1:
+            logging.info('Profiles rejected for being outside time bounds: {:.2f}'.format((n_reject / n_total) * 100))
+            print('Profiles rejected for being outside time bounds: {:.2f}%'.format((n_reject / n_total) * 100))
+            raise ValueError("Some profiles are outside model time bounds.")
+        
+        return
 
 
     def space_bounds(self, ds, ji, score):

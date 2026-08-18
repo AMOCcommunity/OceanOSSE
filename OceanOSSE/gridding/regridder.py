@@ -291,7 +291,7 @@ class IDWRegridder(Regridder):
     def __init__(
         self,
         variables: list[str] | None = None,
-        mask: str | None = None,
+        mask: str | None = "mask",
         depth_max: int | float = 2000.0,
         interp_kwargs: dict | None = None,
     ) -> None:

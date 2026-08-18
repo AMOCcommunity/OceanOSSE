@@ -282,7 +282,8 @@ def test_sampler_space_subset(synthetic_ds):
     synth_domain = synthetic_ds
 
     # Mask land for lon less than 5
-    synth_domain['votemper'] = synth_domain['votemper'].where(synth_domain.lon >= 5)
+    synth_domain['mask'] = synth_domain['mask'].where(synth_domain.lon >= 5).fillna(0)
+    synth_domain['votemper'] = synth_domain['votemper'].where(synth_domain['mask'])
 
     prof_id = np.array([0, 1])
     profile_lon = np.array([3, 8])
@@ -300,7 +301,7 @@ def test_sampler_space_subset(synthetic_ds):
     )
 
     sampler = NNSampler()
-    model_t = sampler.sample(synthetic_ds, profile)
+    model_t = sampler.sample(synth_domain, profile)
     
     assert ((model_t.votemper.sel(profile_id=1) 
             == synthetic_ds.votemper[5, :, 6, 8]).all()
@@ -315,7 +316,8 @@ def test_sampler_space_subset_geoball(synthetic_ds):
     synth_domain = synthetic_ds
 
     # Mask land for lon less than 5
-    synth_domain['votemper'] = synth_domain['votemper'].where(synth_domain.lon >= 5)
+    synth_domain['mask'] = synth_domain['mask'].where(synth_domain.lon >= 5).fillna(0)
+    synth_domain['votemper'] = synth_domain['votemper'].where(synth_domain['mask'])
 
     prof_id = np.array([0, 1])
     profile_lon = np.array([3, 8])
@@ -333,7 +335,7 @@ def test_sampler_space_subset_geoball(synthetic_ds):
     )
 
     sampler = NNSampler()
-    model_t = sampler.sample(synthetic_ds, profile, ij=False)
+    model_t = sampler.sample(synth_domain, profile, ij=False)
 
     assert ((model_t.votemper.sel(profile_id=1) 
             == synthetic_ds.votemper[5, :, 6, 8]).all()
@@ -386,7 +388,7 @@ def test_random(synthetic_ds):
     synth_domain1 = synth_domain.isel(t=slice(0, 12))
 
     # Mask land for lon less than 5
-    synth_domain1['mask'] = synth_domain1['mask'].where(synth_domain1.lon >= 5, synth_domain1['mask'], 0)
+    synth_domain1['mask'] = synth_domain1['mask'].where(synth_domain1.lon >= 5).fillna(0)
     synth_domain1['votemper'] = synth_domain1['votemper'].where(synth_domain1['mask'])
     
     sampler = RandomSampler()
@@ -405,7 +407,7 @@ def test_probability(synthetic_ds):
     synth_domain1 = synth_domain.isel(t=slice(0, 12))
 
     # Mask land for lon less than 5
-    synth_domain1['mask'] = synth_domain1['mask'].where(synth_domain1.lon >= 5, synth_domain1['mask'], 0)
+    synth_domain1['mask'] = synth_domain1['mask'].where(synth_domain1.lon >= 5).fillna(0)
     synth_domain1['votemper'] = synth_domain1['votemper'].where(synth_domain1['mask'])
     
     # synthetic probability map

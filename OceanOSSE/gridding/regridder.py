@@ -171,7 +171,7 @@ class SwapRegridder(Regridder):
     def __init__(
         self,
         variables: list[str] | None = None,
-        mask: str | None = None,
+        mask: str | None = "mask",
         depth_max: int | float = 2000.0,
     ) -> None:
         # -- Initialise Regridder -- #
@@ -250,17 +250,20 @@ class SwapRegridder(Regridder):
         xarray.Dataset
             Dataset of synthetic observations regridded onto target model grid.
         """
-        # Initialise an empty 2-dimensional DataArray representing the model target grid:
-        mask_2d = xr.full_like(ds_mdl["lon"].squeeze(), fill_value=False, dtype=bool).load()
+        # Initialise an empty 3-dimensional DataArray representing the model target grid:
+        mask_3d = (xr.full_like(
+            ds_mdl["lon"].squeeze(), fill_value=False, dtype=bool).expand_dims(
+            dim={"t": ds_mdl["time"].size}).transpose(
+            "t", "j", "i").load().copy(deep=True))
 
-        # Define 2-dimensional boolean mask of target model grid points to insert synthetic profiles:
-        mask_2d.data[ds_obs["t"].values, ds_obs["j"].values, ds_obs["i"].values] = True
+        # Define 3-dimensional boolean mask of target model grid points to insert synthetic profiles:
+        mask_3d.data[ds_obs["t"].values, ds_obs["j"].values, ds_obs["i"].values] = True
 
         # Define depth mask:
         mask_depth = ds_mdl['depth'] <= self._depth_max
 
-        # Define sampling mask using 2-dimensional profile mask, depth mask, and land-sea mask:
-        mask = (mask_2d & mask_depth & ds_mdl[self._mask]).transpose("time", "lev", "j", "i")
+        # Define sampling mask using 3-dimensional profile mask, depth mask, and land-sea mask:
+        mask = (mask_3d & mask_depth & ds_mdl[self._mask]).transpose("t", "lev", "j", "i")
 
         # Define output Dataset:
         ds_out = xr.Dataset()

@@ -25,7 +25,7 @@ import datetime as dt
 import numpy as np
 import xarray as xr
 from OceanOSSE.sampling.sampler_nearest_neighbour import NNSampler
-
+from OceanOSSE.sampling.sampler_random import RandomSampler
 
 def test_sampler_coords(synthetic_ds):
     # Synthetic profile
@@ -47,8 +47,8 @@ def test_sampler_coords(synthetic_ds):
     sampler = NNSampler()
     model_t = sampler.sample(synthetic_ds, profile)
 
-    assert ((set(model_t.dims) == {'d', 'profile_id'}) 
-            & (set(model_t.coords) == {'d', 'profile_id', 'i', 'j', 't'}))
+    assert ((set(model_t.dims) == {'lev', 'profile_id'}) 
+            & (set(model_t.coords) == {'lev', 'profile_id', 'i', 'j', 't'}))
 
 
 def test_sampler(synthetic_ds):
@@ -156,8 +156,8 @@ def test_sampler_coords_geoball(synthetic_ds):
     sampler = NNSampler()
     model_t = sampler.sample(synthetic_ds, profile, ij=False)
 
-    assert ((set(model_t.dims) == {'d', 'profile_id'}) 
-            & (set(model_t.coords) == {'d', 'profile_id', 'i', 'j', 't'}))
+    assert ((set(model_t.dims) == {'lev', 'profile_id'}) 
+            & (set(model_t.coords) == {'lev', 'profile_id', 'i', 'j', 't'}))
 
 
 def test_sampler_geoball(synthetic_ds):
@@ -190,8 +190,8 @@ def test_sampler_geoball(synthetic_ds):
             & (model_t.votemper.isel(profile_id=1) 
             == synthetic_ds.votemper[114, :, 2, 1]).all())
 
- 
-def test_sampler_time(synthetic_ds):
+
+def test_sampler_time(synthetic_ds): 
     """
     Tests for extracting a profile that falls on a model grid point but 
     inbetween two time steps.
@@ -282,7 +282,8 @@ def test_sampler_space_subset(synthetic_ds):
     synth_domain = synthetic_ds
 
     # Mask land for lon less than 5
-    synth_domain['votemper'] = synth_domain['votemper'].where(synth_domain.lon >= 5)
+    synth_domain['mask'] = synth_domain['mask'].where(synth_domain.lon >= 5).fillna(0)
+    synth_domain['votemper'] = synth_domain['votemper'].where(synth_domain['mask'])
 
     prof_id = np.array([0, 1])
     profile_lon = np.array([3, 8])
@@ -300,7 +301,7 @@ def test_sampler_space_subset(synthetic_ds):
     )
 
     sampler = NNSampler()
-    model_t = sampler.sample(synthetic_ds, profile)
+    model_t = sampler.sample(synth_domain, profile)
     
     assert ((model_t.votemper.sel(profile_id=1) 
             == synthetic_ds.votemper[5, :, 6, 8]).all()
@@ -315,7 +316,8 @@ def test_sampler_space_subset_geoball(synthetic_ds):
     synth_domain = synthetic_ds
 
     # Mask land for lon less than 5
-    synth_domain['votemper'] = synth_domain['votemper'].where(synth_domain.lon >= 5)
+    synth_domain['mask'] = synth_domain['mask'].where(synth_domain.lon >= 5).fillna(0)
+    synth_domain['votemper'] = synth_domain['votemper'].where(synth_domain['mask'])
 
     prof_id = np.array([0, 1])
     profile_lon = np.array([3, 8])
@@ -333,11 +335,102 @@ def test_sampler_space_subset_geoball(synthetic_ds):
     )
 
     sampler = NNSampler()
-    model_t = sampler.sample(synthetic_ds, profile, ij=False)
+    model_t = sampler.sample(synth_domain, profile, ij=False)
 
     assert ((model_t.votemper.sel(profile_id=1) 
             == synthetic_ds.votemper[5, :, 6, 8]).all()
             & (model_t.sizes['profile_id'] == 1))
+
+
+def test_random_coords(synthetic_ds):
+    """
+    Tests sampler for fully random locations produces the right style output.
+    """
+    # Synthetic domain
+    synth_domain = synthetic_ds
+    synth_domain1 = synth_domain.isel(t=slice(0, 12))
+   
+    sampler = RandomSampler()
+    model_t = sampler.sample(synth_domain1)
+    
+    assert ((set(model_t.dims) == {'lev', 'profile_id'}) 
+        & (set(model_t.coords) == {'lev', 'profile_id', 'i', 'j', 't'}))
+    
+def test_prob_coords(synthetic_ds):
+    """
+    Tests sampler for probability produces the right style output.
+    """
+    # Synthetic domain
+    synth_domain = synthetic_ds
+    synth_domain1 = synth_domain.isel(t=slice(0, 12))
+    
+    ny = synth_domain1.sizes["j"]
+    nx = synth_domain1.sizes["i"]
+    prob = np.ones((ny, nx))
+    probability = xr.DataArray(
+        prob, dims=("j", "i"), coords={"j": synth_domain1.j, "i": synth_domain1.i}
+        )
+    probability = probability / probability.sum()
+    
+    sampler = RandomSampler()
+    model_t = sampler.sample(synth_domain1, prob=probability)
+    
+    assert ((set(model_t.dims) == {'lev', 'profile_id'}) 
+        & (set(model_t.coords) == {'lev', 'profile_id', 'i', 'j', 't'}))
+    
+    
+def test_random(synthetic_ds):
+    """
+    Tests for extracting profiles from fully random locations.
+    """
+    # Synthetic domain
+    synth_domain = synthetic_ds
+    synth_domain1 = synth_domain.isel(t=slice(0, 12))
+
+    # Mask land for lon less than 5
+    synth_domain1['mask'] = synth_domain1['mask'].where(synth_domain1.lon >= 5).fillna(0)
+    synth_domain1['votemper'] = synth_domain1['votemper'].where(synth_domain1['mask'])
+    
+    sampler = RandomSampler()
+    model_t = sampler.sample(synth_domain1)
+    
+    assert (model_t['profile_id'].size == 1200)
+    assert (model_t.votemper.notnull().all())
+
+    
+def test_probability(synthetic_ds):
+    """
+    Tests for extracting profiles from probability map.
+    """
+    # Synthetic domain
+    synth_domain = synthetic_ds
+    synth_domain1 = synth_domain.isel(t=slice(0, 12))
+
+    # Mask land for lon less than 5
+    synth_domain1['mask'] = synth_domain1['mask'].where(synth_domain1.lon >= 5).fillna(0)
+    synth_domain1['votemper'] = synth_domain1['votemper'].where(synth_domain1['mask'])
+    
+    # synthetic probability map
+    ny = synth_domain1.sizes["j"]
+    nx = synth_domain1.sizes["i"]
+    y = np.linspace(0, 1, ny)[:, None]   # south -> north
+    x = np.linspace(0, 1, nx)[None, :]   # west -> east
+    gradient = (x + y) / 2
+    
+    probability = xr.DataArray(
+        gradient, dims=("j", "i"), coords={"j": synth_domain1.j, "i": synth_domain1.i}
+        )
+    probability = probability.where(synth_domain1.lon >= 4, 0)
+    probability = probability / probability.sum()
+    
+    sampler = RandomSampler()
+    model_t = sampler.sample(synth_domain1, prob=probability)
+
+    assert (model_t['profile_id'].size == 1200)
+    # at least 60 % of point should be in north east
+    assert (model_t.votemper.where(
+        (model_t.lon >= 5) & (model_t.lat >= 3)
+        ).isel(lev=0).notnull().sum().item() >= 720)
 
 
 @pytest.fixture
@@ -358,18 +451,20 @@ def synthetic_ds() -> xr.Dataset:
     
     # Synthetic temperature field
     votemper =  15 - (y * 0.4) + (x * 0.2) - (d * 0.05) + (t * 0.000005)
+    mask = np.ones_like(votemper[0, :, :, :])
     
     # Build dataset
     ds = xr.Dataset(
         {
-            "votemper": (("t", "d", "j", "i"), votemper),
+            "votemper": (("t", "lev", "j", "i"), votemper),
             "lat": (("j", "i"), y[0, 0, :, :]),
             "lon": (("j", "i"), x[0, 0, :, :]),
-            "depth": (("d", "j", "i"), d[0, :, :, :]),
+            "depth": (("lev", "j", "i"), d[0, :, :, :]),
+            "mask": (("lev", "j", "i"), mask),
             "time": (("t"), model_dates)
         },
         coords={
-            "d": depth,
+            "lev": depth,
             "j": lat,
             "i": lon,
             "t": model_day

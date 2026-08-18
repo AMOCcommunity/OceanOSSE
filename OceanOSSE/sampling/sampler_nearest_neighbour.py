@@ -92,6 +92,8 @@ class NNSampler(ObsSampler):
         if ij:
             t_nn = self.find_nearest_time(ds, profile)
             i_nn, j_nn = self.find_nearest_ij(ds, profile)
+            # assign i and j to the t index to have compatible coodinates
+            t_nn = t_nn.sel(profile_id=i_nn['profile_id'])
             ds_synth = extract_locations_ij(ds, i_nn, j_nn, t_nn)
         
         else:

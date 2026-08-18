@@ -206,10 +206,10 @@ class NNSampler(ObsSampler):
         n_total = ji.profile_id.size
 
         # mask and recalculate distance to see if any points are on land.
-        mask = xr.DataArray(ds.votemper.isel({"d": 0, "t": 0}).isnull())
-        mask = mask.drop_vars(['t', 'd'])
+        # surface layer: 0 land, 1 sea
+        mask = ds.mask.isel({"lev": 0}).drop_vars(["lev"]).astype(bool)
         mask = mask.stack(gridpoint=("j", "i"))
-        score_masked = score.where(~mask, drop=True)
+        score_masked = score.where(mask, drop=True)
             
         nearest = score_masked.argmin("gridpoint")
         ji_masked = score_masked["gridpoint"].isel(gridpoint=nearest)
@@ -223,7 +223,6 @@ class NNSampler(ObsSampler):
             + '{:.2f}%'.format((n_reject / n_total) * 100))
         if n_reject / n_total == 1:
             raise ValueError("All profiles outside model time bounds.")
-        
         return ji
  
     
@@ -320,7 +319,7 @@ class NNSampler(ObsSampler):
         self.time_name = 'time'
 
         # Mask lat and lon where land is present
-        mask = xr.DataArray(ds.votemper.isel({"d": 0, "t": 0}).notnull())
+        mask = ds.mask.isel({"lev": 0}).drop_vars(["lev"])
         ds = ds.set_coords(["lat", "lon", "time"])
 
         # Collapse the horizontal grid to an irregular point dimension.

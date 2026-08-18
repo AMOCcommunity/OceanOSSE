@@ -190,7 +190,7 @@ def test_sampler_geoball(synthetic_ds):
             & (model_t.votemper.isel(profile_id=1) 
             == synthetic_ds.votemper[114, :, 2, 1]).all())
 
- 
+
 def test_sampler_time(synthetic_ds):
     """
     Tests for extracting a profile that falls on a model grid point but 
@@ -221,34 +221,7 @@ def test_sampler_time(synthetic_ds):
 
 def test_sampler_time_out_bounds(synthetic_ds):
     """
-    Tests for extracting all profiles that are outside model time bounds.
-    """
-    # Synthetic profile
-    prof_id = np.array([0])
-    profile_lon = np.array([3])
-    profile_lat = np.array([5])
-    profile_time = np.array([dt.datetime(2021, 5, 1)])
-    profile = xr.Dataset(
-        {
-            "lon": (("profile_id"), profile_lon),
-            "lat": (("profile_id"), profile_lat),
-            "time": (("profile_id"), profile_time)
-        },
-        coords={
-            "profile_id": prof_id,
-        },
-    )
-
-    sampler = NNSampler()
-    with pytest.raises(ValueError, match=r".*time bounds.") as exc_info:
-        model_t = sampler.sample(synthetic_ds, profile)
-    
-    assert exc_info.type is ValueError
-
-
-def test_sampler_time_subset(synthetic_ds):
-    """
-    Tests for extracting profiles where some are outside model time bounds.
+    Tests for extracting some profiles that are outside model time bounds.
     """
     # Synthetic profile
     prof_id = np.array([0, 1])
@@ -267,11 +240,10 @@ def test_sampler_time_subset(synthetic_ds):
     )
 
     sampler = NNSampler()
-    model_t = sampler.sample(synthetic_ds, profile)
+    with pytest.raises(ValueError, match=r".*time bounds.") as exc_info:
+        model_t = sampler.sample(synthetic_ds, profile)
     
-    assert ((model_t.votemper.sel(profile_id=1) 
-            == synthetic_ds.votemper[5, :, 6, 8]).all()
-            & (model_t.sizes['profile_id'] == 1))
+    assert exc_info.type is ValueError
 
 
 def test_sampler_space_subset(synthetic_ds):

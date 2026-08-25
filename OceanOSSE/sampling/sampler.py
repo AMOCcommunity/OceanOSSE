@@ -18,6 +18,11 @@ import xarray as xr
 from xarray.indexes import NDPointIndex
 from xoak import SklearnGeoBallTreeAdapter
 
+from OceanOSSE.sampling.utils import (
+    _collect_obs_probability,
+    _collect_obs_profiles,
+    _extract_locations_ij,
+)
 from OceanOSSE.utils import import_class
 
 logger = logging.getLogger(__name__)
@@ -348,11 +353,40 @@ class NNSampler(ObsSampler):
         List of ErrorKernel instances to apply sequentially to the sampled
         synthetic observations dataset, by default None.
     """
+    def __init__(self,
+                 error_kernels: list[ErrorKernel] | None = None,
+                 start_date: str | None = None,
+                 end_date: str | None = None,
+                 bbox: tuple | None = None
+                 ):
+        # -- Validate Inputs -- #
+        if error_kernels is not None:
+            if not isinstance(error_kernels, list):
+                raise TypeError(
+                    "`error_kernels` must be a list of ErrorKernel instances."
+                )
+            for n, kernel in enumerate(error_kernels):
+                if not isinstance(kernel, ErrorKernel):
+                    raise TypeError(f"`error_kernels[{n}]` must be an ErrorKernel.")
+        if start_date is not None and not isinstance(start_date, str):
+            raise TypeError("``start_date`` must be a str.")
+        if end_date is not None and not isinstance(end_date, str):
+            raise TypeError("``end_date`` must be a str.")
+        if bbox is not None and not (isinstance(bbox, tuple) and len(bbox) == 4):
+            raise TypeError("``bbox`` must be a tuple of length 4.")
+
+        # -- Initialise ObsSampler -- #
+        super().__init__(error_kernels=error_kernels)
+
+        # -- Validate Inputs -- #
+        self._start_date = start_date
+        self._end_date = end_date
+        self._bbox = bbox
 
     @classmethod
     def from_config(cls, config: dict) -> Self:
         """
-        Parameters
+        Parameterss
         ----------
         config : dict
             Configuration dictionary containing input parameters from .toml
@@ -370,8 +404,28 @@ class NNSampler(ObsSampler):
         # -- Collect ErrorKernel instances from configuration -- #
         error_kernels = get_error_kernels(config=config)
 
-        # -- Instantiate NNSampler with collected ErrorKernel instances -- #
-        return cls(error_kernels=error_kernels or None)
+        # -- Instantiate NNSampler from config dict -- #
+        start_date = config["sampling"].get("start_date", None)
+        if start_date is None:
+            logger.info(
+                "Missing `start_date` entry in [sampling] table of config .toml file -> default is None."
+            )
+        end_date = config["sampling"].get("end_date", None)
+        if end_date is None:
+            logger.info(
+                "Missing `end_date` entry in [sampling] table of config .toml file -> default is None."
+            )
+        bbox = config["sampling"].get("bbox", None)
+        if bbox is None:
+            logger.info(
+                "Missing `bbox` entry in [sampling] table of config .toml file -> default is None."
+            )
+
+        return cls(error_kernels=error_kernels or None,
+                   start_date=start_date,
+                   end_date=end_date,
+                   bbox=bbox
+                   )
 
 
     def collect_samples(
@@ -401,19 +455,22 @@ class NNSampler(ObsSampler):
         xarray.Dataset
             Sampled synthetic observations dataset.
         """
-        # Select only profiles within model time bounds:
-        profile = self._time_bounds(ds_mdl, ds_prof)
+        # Collect historical observational profiles:
+        ds_prof = _collect_obs_profiles(start_date=ds_mdl["time"].min().dt.strftime("%Y-%m-%d").item(),
+                                        end_date=ds_mdl["time"].max().dt.strftime("%Y-%m-%d").item(),
+                                        bbox=None,
+                                        )
 
         if method == "ij":
             # Find nearest model grid point in i,j coordinates for each profile:
-            t_nn = self._find_nearest_time(ds_mdl, profile)
-            i_nn, j_nn = self._find_nearest_ij(ds_mdl, profile)
-            ds_synth = self._extract_locations_ij(ds_mdl, i_nn, j_nn, t_nn)
+            t_nn = self._find_nearest_time(ds_mdl, ds_prof)
+            i_nn, j_nn = self._find_nearest_ij(ds_mdl, ds_prof)
+            ds_synth = _extract_locations_ij(ds_mdl, i_nn, j_nn, t_nn)
         
         elif method == "geoball":
             # Find nearest model grid point in geospatial coordinates for each profile:
             ds_mdl = self._find_nearest_geoball(ds_mdl)
-            ds_synth = self._extract_locations_geoball(ds_mdl, profile)
+            ds_synth = self._extract_locations_geoball(ds_mdl, ds_prof)
 
         else:
             raise ValueError(
@@ -426,7 +483,6 @@ class NNSampler(ObsSampler):
         
         return ds_synth
 
-    
     def sample(
         self,
         ds_mdl: xr.Dataset,
@@ -464,7 +520,6 @@ class NNSampler(ObsSampler):
 
         return ds_obs
 
-    
     def _time_bounds(self, ds, profile):
         """
         Remove profiles that are out of model bounds in time.
@@ -497,8 +552,7 @@ class NNSampler(ObsSampler):
         profile = profile.where(t_xa, drop=True)
 
         return profile
- 
-    
+
     def _find_nearest_ij(self, ds, profile):
         """
         Turn observation lat and lon into model index
@@ -539,7 +593,6 @@ class NNSampler(ObsSampler):
 
         return i_nn, j_nn
 
-
     def _find_nearest_time(self, ds, profile, thresh=10):
         """
         Turn observation time into model time index
@@ -573,29 +626,6 @@ class NNSampler(ObsSampler):
                 raise ValueError("Profile time is outside model time bounds.")
         
         return t_nn
-
-    
-    def _extract_locations_ij(self, ds, i_index, j_index, t_index):
-        """
-        Extract a model profile at the specified model index.
-
-        Parameters
-        ----------
-        ds : xarray.Dataset
-            Gridded ocean model dataset.
-        i_index : observation index on model grid in i direction
-        j_index : observation index on model grid in j direction
-        t_index : observation index in time
-
-        Return
-        xarray.Dataset
-            Model profile dataset
-        """
-
-        ds_model_profile = ds.isel(i=i_index, j=j_index, t=t_index)
-        
-        return ds_model_profile
-        
 
     def _find_nearest_geoball(self, ds):
         """
@@ -650,3 +680,270 @@ class NNSampler(ObsSampler):
         ds_model_profile = ds_model_profile.reset_coords(['lat', 'lon', 'time'])
       
         return ds_model_profile
+
+
+class RandomSampler(ObsSampler):
+    """
+    Class for randomly sampling gridded ocean model output analogously
+    to an ocean observing platform (e.g., Argo floats).
+    """
+    def __init__(self,
+                 error_kernels: list[ErrorKernel] | None = None,
+                 n_samples: int = 100,
+                 source: str = "argo",
+                 start_date: str | None = None,
+                 end_date: str | None = None,
+                 bbox: tuple | None = None
+                 ):
+        # -- Validate Inputs -- #
+        if error_kernels is not None:
+            if not isinstance(error_kernels, list):
+                raise TypeError(
+                    "`error_kernels` must be a list of ErrorKernel instances."
+                )
+            for n, kernel in enumerate(error_kernels):
+                if not isinstance(kernel, ErrorKernel):
+                    raise TypeError(f"`error_kernels[{n}]` must be an ErrorKernel.")
+
+        # -- Initialise ObsSampler -- #
+        super().__init__(error_kernels=error_kernels)
+
+        # -- Validate Inputs -- #
+        if not isinstance(n_samples, int):
+            raise TypeError("``n_samples`` must be an int.")
+        self._n_samples = n_samples
+
+        if not isinstance(source, str):
+            raise TypeError("``source`` must be a str.")
+        self._source = source
+
+        if start_date is not None and not isinstance(start_date, str):
+            raise TypeError("``start_date`` must be a str.")
+        self._start_date = start_date
+
+        if end_date is not None and not isinstance(end_date, str):
+            raise TypeError("``end_date`` must be a str.")
+        self._end_date = end_date
+
+        if bbox is not None and not (isinstance(bbox, tuple) and len(bbox) == 4):
+            raise TypeError("``bbox`` must be a tuple of length 4.")
+        self._bbox = bbox
+
+    @classmethod
+    def from_config(cls, config: dict) -> Self:
+        """
+        Parameterss
+        ----------
+        config : dict
+            Configuration dictionary containing input parameters from .toml
+            configuration file.
+
+        Returns
+        -------
+        Self
+            Initialised ObsSampler instance.
+        """
+        # -- Verify Input -- #
+        if not isinstance(config, dict):
+            raise TypeError("config must be a dictionary.")
+
+        # -- Collect ErrorKernel instances from configuration -- #
+        error_kernels = get_error_kernels(config=config)
+
+        # -- Instantiate RandomSampler from config dict -- #
+        n_samples = config["sampling"].get("n_samples", None)
+        if n_samples is None:
+            raise ValueError(
+                "Missing `n_samples` entry in [sampling] table of config .toml file."
+            )
+        source = config["sampling"].get("source", None)
+        if source is None:
+            raise ValueError(
+                "Missing `source` entry in [sampling] table of config .toml file. Options are: 'idealised' or 'argo'."
+            )
+        start_date = config["sampling"].get("start_date", None)
+        if start_date is None:
+            logger.info(
+                "Missing `start_date` entry in [sampling] table of config .toml file -> Using ."
+            )
+        end_date = config["sampling"].get("end_date", None)
+        if end_date is None:
+            logger.info(
+                "Missing `end_date` entry in [sampling] table of config .toml file -> default is None."
+            )
+        bbox = config["sampling"].get("bbox", None)
+        if bbox is None:
+            logger.info(
+                "Missing `bbox` entry in [sampling] table of config .toml file -> default is None."
+            )
+
+        return cls(error_kernels=error_kernels or None,
+                   n_samples=n_samples,
+                   source=source,
+                   start_date=start_date,
+                   end_date=end_date,
+                   bbox=bbox
+                   )
+
+    def collect_samples(
+        self,
+        ds_mdl: xr.Dataset,
+        ds_prob: xr.Dataset = None
+        ) -> xr.Dataset:
+        """
+        Parameters
+        ----------
+        ds_mdl : xarray.Dataset
+            Gridded ocean model output dataset.
+        ds_prob : xarray.Dataset
+            Sample probability distribution.
+            
+        Returns
+        -------
+        xarray.Dataset
+            Sampled synthetic observations dataset.
+        """
+        # -- Create empty (i,j,t) indices for sampled profiles -- #
+        n_profiles = self._n_samples * ds_mdl['time'].size
+
+        prof_id = xr.DataArray(np.arange(n_profiles), dims="profile_id")
+        i_index = xr.DataArray(np.zeros((n_profiles), dtype=int), dims="profile_id", coords={"profile_id": prof_id})
+        j_index = xr.DataArray(np.zeros((n_profiles), dtype=int), dims="profile_id", coords={"profile_id": prof_id})
+        time_index = xr.DataArray(np.zeros((n_profiles), dtype=int), dims="profile_id", coords={"profile_id": prof_id})
+
+        # -- Collect random samples from the ocean model grid -- #
+        for t in range(ds_mdl['time'].size):
+            # Get sample indices for current time-step:
+            nst = t * self._n_samples
+            nen = (t + 1) * self._n_samples
+            if ds_prob is not None:
+                # Select probability distribution for current month:
+                prob = ds_prob["probability"].sel({"month": ds_mdl["month"].isel({"time": t})})
+            else:
+                # Use uniform probability distribution for idealised random sampling:
+                prob = None
+            # Add (i,j,t) indices for randomly sampled profiles:
+            time_index.data[nst:nen] = t
+            i_index.data[nst:nen], j_index.data[nst:nen] = self._collect_random_sample(ds_mdl=ds_mdl,
+                                                                                       n_samples=self._n_samples,
+                                                                                       probability=prob
+                                                                                       )
+
+        logger.info("--> Completed: Collected ocean model grid indices for synthetic profiles.")
+
+        # -- Extract model profiles at the sampled locations -- #
+        ds_synth = _extract_locations_ij(ds_mdl=ds_mdl,
+                                         i_index=i_index,
+                                         j_index=j_index,
+                                         time_index=time_index
+                                         )
+
+        logger.info("--> Completed: Extracted synthetic profiles from ocean model dataset.")
+
+        return ds_synth
+
+    def apply_errors(self, ds_obs: xr.Dataset) -> xr.Dataset:
+        """
+        Parameters
+        ----------
+        ds_obs : xarray.Dataset
+            Synthetic observations dataset.
+
+        Returns
+        -------
+        xarray.Dataset
+            Synthetic observations dataset with all error kernels
+            applied in order.
+        """
+        # -- Apply each Error Kernel sequentially -- #
+        if self._error_kernels is not None:
+            for kernel in self._error_kernels:
+                logger.debug(f"Applying ErrorKernel --> {repr(kernel)}")
+                ds_obs = kernel.apply(ds_obs)
+            logger.info(
+                "--> Completed: Applied ErrorKernels to synthetic observations."
+            )
+
+        return ds_obs
+
+    def sample(self, ds_mdl: xr.Dataset) -> xr.Dataset:
+        """
+        Perform sampling pipeline for chosen ocean observing platform.
+        
+        Parameters
+        ----------
+        ds_mdl : xarray.Dataset
+            Gridded ocean model dataset.
+
+        Returns
+        -------
+        xarray.Dataset
+            Synthetic observations dataset with errors applied.
+        """
+        # -- Collect probability distribution for sampling -- #
+        if self._source == "argo":
+            ds_prob = _collect_obs_probability(ds_mdl=ds_mdl,
+                                            start_date=self._start_date,
+                                            end_date=self._end_date,
+                                            bbox=self._bbox
+                                            )
+            logger.info(
+                "--> Completed: Collected probability distribution for historical Argo profile observations."
+            )
+        elif self._source == "idealised":
+            ds_prob = None
+            logger.info(
+                "--> Completed: Using uniform probability distribution for idealised random sampling."
+            )
+        else:
+            raise ValueError(
+                "Invalid `source` value in [sampling] table of config .toml file. Options are: 'argo' or 'idealised'."
+            )
+
+        # -- Sample the gridded ocean model output -- #
+        ds_obs = self.collect_samples(ds_mdl=ds_mdl, ds_prob=ds_prob)
+
+        # -- Apply error kernels sequentially to the synthetic observations -- #
+        ds_obs = self.apply_errors(ds_obs=ds_obs)
+
+        return ds_obs
+
+    def _collect_random_sample(
+        self,
+        ds_mdl: xr.Dataset,
+        n_samples: int,
+        probability: xr.DataArray = None
+        ) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Collect a random set of profiles in the model domain. 
+        If probability is given take a semi-random set of profiles 
+        in the model domain based on a probability distribution.
+        
+        Parameters
+        ----------
+        ds_mdl : xarray.Dataset
+            Gridded ocean model dataset.
+        n_samples : int 
+            Number of samples desired
+        probability : xarray.DataArray
+            Sampling probability distribution
+
+        Returns
+        -------
+        tuple
+            (i, j) coordinates of synthetic profiles
+        """
+        # Define surface land-sea mask [0: land, 1: sea]:
+        mask = ds_mdl["mask"].isel({"lev": 0})
+                            
+        if probability is None:
+            # Create time-independent probability map neglecting land points:
+            probability = xr.ones_like(mask).where(mask == 1).fillna(0)
+            # Normalise probabilities (0-1):
+            probability = probability / probability.sum()
+
+        # Sample random indices using the probability distribution:
+        flat_idx = np.random.choice(mask.size, size=n_samples, p=probability.values.ravel())
+        j_random, i_random = np.unravel_index(flat_idx, mask.shape)
+        
+        return i_random, j_random

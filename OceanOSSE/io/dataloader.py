@@ -164,15 +164,17 @@ class DataLoader(abc.ABC):
             Dataset with standardised dimension and coordinate names.
         """
         # -- Rename dimensions to standard dimensions names -- #
-        rename_dims = {value: key for key, value in self._dimensions.items()}
+        # Rename only dimensions without standard names:
+        rename_dims = {value: key for key, value in self._dimensions.items() if value != key}
         ds = ds.rename_dims(rename_dims)
 
         # -- Assign standard coordinate names and drop any non-standard coordinates -- #
-        ds = ds.assign_coords(
-            {coord: ds[var] for coord, var in self._coordinates.items()}
-        )
-        drop_coords = [coord for coord in ds.coords if coord not in self._coordinates]
-        ds = ds.drop_vars(drop_coords)
+        if self._coordinates is not None:
+            ds = ds.assign_coords(
+                {coord: ds[var] for coord, var in self._coordinates.items()}
+            )
+            drop_coords = [coord for coord in ds.coords if coord not in self._coordinates]
+            ds = ds.drop_vars(drop_coords)
 
         return ds
 
@@ -213,10 +215,11 @@ class DataLoader(abc.ABC):
             required_coords = ["time", "depth", "lat", "lon"]
         missing_coords = [coord for coord in required_coords if coord not in ds.coords]
         if missing_coords:
-            raise ValueError(
-                f"{type(self).__name__}: loaded dataset is missing required "
-                f"coordinate(s): {missing_coords}. Found coordinates: {list(ds.coords)}."
-            )
+            if self._table != "domain":
+                raise ValueError(
+                    f"{type(self).__name__}: loaded dataset is missing required "
+                    f"coordinate(s): {missing_coords}. Found coordinates: {list(ds.coords)}."
+                )
 
 
 # -- DataLoader Implementations -- #

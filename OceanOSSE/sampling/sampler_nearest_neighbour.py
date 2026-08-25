@@ -32,7 +32,7 @@ from xoak import SklearnGeoBallTreeAdapter
 
 from OceanOSSE.utils import import_class
 from OceanOSSE.sampling.sampler import ErrorKernel, ObsSampler
-from OceanOSSE.sampling.utilities import extract_locations_ij
+from OceanOSSE.sampling.utils import extract_locations_ij
 
 logger = logging.getLogger(__name__)
 

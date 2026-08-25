@@ -2,16 +2,39 @@
 > Python toolbox for performing Observing System Simulation Experiments (OSSEs) in ocean general circulation models.
 
 <!-- Badges: replace URLs and slugs to match your repository and services -->
+[![Xarray](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/pydata/xarray/refs/heads/main/doc/badge.json)](https://xarray.dev)
+[![Powered by Pixi](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/prefix-dev/pixi/main/assets/badge/v0.json)](https://pixi.sh)
 [![CI](https://github.com/AMOCcommunity/OceanOSSE/actions/workflows/ci.yml/badge.svg)](https://github.com/AMOCcommunity/OceanOSSE/actions/workflows/ci.yml)
 [![License](https://img.shields.io/github/license/AMOCcommunity/OceanOSSE)](LICENSE)
 <!-- [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.XXXXXXX.svg)](https://doi.org/10.5281/zenodo.XXXXXXX) -->
 <!-- [![PyPI version](https://img.shields.io/pypi/v/<your-package>)](https://pypi.org/project/<your-package>/) -->
 
-### **-- OceanOSSE is Under Active Development --**
+### **OceanOSSE is Under Active Development**
 
-## Overview
+## About
 
-*
+OceanOSSE is an open-soource Python toolbox developed as part of the Explaining and Predicting the Ocean Conveyor (EPOC) project for performing Observing System Simulation Experiments (OSSEs) in ocean general circulation models.
+
+OceanOSSE allows users to generate seawater property fields (analogous to a Level 4 gridded product) from synthetic observations (e.g., Argo, moorings etc.) of time-evolving ocean model outputs. Critically, OceanOSSE also regrids the sparse, synthetic observations onto the native ocean model grid, enabling familiar, grid-aware computation with the resulting output fields.
+
+OceanOSSE uses a modular and customisable framework; the main experiment pipeline implements four *Abstract Base Classes*:
+
+* **DataLoader:**
+
+  Read ocean model input files, climatology & domain variables.
+
+* **ObsSampler:**
+
+  Perform synthetic sampling of ocean model "truth", returning a sparse Dataset of observations.
+
+* **Regridder:**
+  
+  Regrid sparse synthetic observations onto the native ocean model grid.
+
+* **DataWriter:**
+
+  Write regridded synthetically observed variables to output file.
+
 
 ---
 
@@ -74,8 +97,10 @@ See [**CONTRIBUTING.md**](CONTRIBUTING.md) for full details on the development w
 
 ### Quick Start
 
+To run a new OSSE experiment with `OceanOSSE`, we can use the `oceanosse` command-line interface:
+
 ```bash
-ocean_osse run 
+oceanosse run 
 ```
 
 ### Examples

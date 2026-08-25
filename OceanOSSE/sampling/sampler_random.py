@@ -24,13 +24,13 @@ Created By: OceanOSSE Development Team (NOC, UK)
 from __future__ import annotations
 
 import logging
+from typing import Self
 
-import xarray as xr
 import numpy as np
+import xarray as xr
 
-from OceanOSSE.utils import import_class
 from OceanOSSE.sampling.sampler import ErrorKernel, ObsSampler
-from OceanOSSE.sampling.utils import extract_locations_ij
+from OceanOSSE.sampling.utils import _extract_locations_ij
 
 logger = logging.getLogger(__name__)
 
@@ -72,13 +72,13 @@ class RandomSampler(ObsSampler):
         return self
     
 
-    def collect_samples(self, ds, prob=None) -> xr.Dataset:
+    def collect_samples(self, ds: xr.Dataset, prob: xr.DataArray | None = None) -> xr.Dataset:
         """
         Parameters
         ----------
         ds : xarray.Dataset
             Gridded ocean model output dataset.
-        prob : xarray.Dataset
+        prob : xarray.DataArray | None
             Loaded probability distribution.
             
         Returns
@@ -113,7 +113,7 @@ class RandomSampler(ObsSampler):
         j_index = xr.DataArray(j_index, dims="profile_id", coords={"profile_id": prof_id})
         t_index = xr.DataArray(t_index, dims="profile_id", coords={"profile_id": prof_id})
 
-        ds_synth = extract_locations_ij(ds, i_index, j_index, t_index)
+        ds_synth = _extract_locations_ij(ds, i_index, j_index, t_index)
 
         return ds_synth
     
@@ -143,7 +143,7 @@ class RandomSampler(ObsSampler):
         return ds
     
     
-    def sample(self, ds: xr.Dataset, prob: Optional[xr.DataArray] = None) -> xr.Dataset:
+    def sample(self, ds: xr.Dataset, prob: xr.DataArray | None = None) -> xr.Dataset:
         """
         Perform sampling pipeline for chosen ocean observing platform.
         
@@ -171,7 +171,7 @@ class RandomSampler(ObsSampler):
         return ds_obs
 
     
-    def random_sample(self, ds, n_sample, prob=None):
+    def random_sample(self, ds: xr.Dataset, n_sample: int, prob: xr.DataArray | None = None):
         """
         Take a random set of profiles in the model domain. 
         If probability is given take a semi-random set of profiles 
@@ -183,14 +183,14 @@ class RandomSampler(ObsSampler):
             Gridded ocean model dataset.
         n_sample : int 
             Number of samples desired
-        prob : xarray.Dataset
+        prob : xarray.DataArray | None
             Probability distribution
 
         Return
         coords : xarray.Dataset
             model i and j coordinates for profiles
         """
-           
+
         sizes = ds.sizes
 
         # surface layer: 0 land, 1 sea

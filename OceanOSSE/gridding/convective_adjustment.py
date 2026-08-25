@@ -3,9 +3,36 @@ import numpy as np
 import xarray as xr
 
 
-def convective_adjustment(SA, CT, p, h, dim="lev"):
-    """Apply convective adjustment along a depth dimension."""
+def convective_adjustment(
+    SA: xr.DataArray,
+    CT: xr.DataArray,
+    p: xr.DataArray,
+    h: xr.DataArray,
+    dim="lev",
+    ) -> tuple[xr.DataArray, xr.DataArray]:
+    """
+    Apply convective adjustment along a specified depth dimension (`dim`).
 
+    Parameters
+    ----------
+    SA : xarray.DataArray
+        Absolute Salinity
+    CT : xarray.DataArray
+        Conservative Temperature
+    p : xarray.DataArray
+        Pressure (dbar)
+    h : xarray.DataArray
+        Grid cell thickness
+    dim : str, optional
+        Name of the depth dimension (default is "lev")
+
+    Returns
+    -------
+    SA_out : xarray.DataArray
+        Adjusted Absolute Salinity
+    CT_out : xarray.DataArray
+        Adjusted Conservative Temperature
+    """
     SA_out, CT_out = xr.apply_ufunc(
         _convective_adjustment,
         SA,
@@ -22,20 +49,32 @@ def convective_adjustment(SA, CT, p, h, dim="lev"):
     return SA_out, CT_out
 
 
-def _convective_adjustment(SA, CT, p, h):
+def _convective_adjustment(
+    SA: np.ndarray,
+    CT: np.ndarray,
+    p: np.ndarray,
+    h: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Fully convectively mix an unstable water column.
 
     Parameters
     ----------
-    SA : Absolute Salinity
-    CT : Conservative Temperature
-    p  : pressure (dbar)
-    h  : layer thickness
+    SA : np.ndarray
+        Absolute Salinity
+    CT : np.ndarray
+        Conservative Temperature
+    p : np.ndarray
+        Pressure (dbar)
+    h : np.ndarray
+        Grid cell thickness
 
     Returns
     -------
-    SA_new, CT_new
+    SA_new : np.ndarray
+        Adjusted Absolute Salinity
+    CT_new : np.ndarray
+        Adjusted Conservative Temperature
     """
     SA = np.asarray(SA, dtype=np.float64)
     CT = np.asarray(CT, dtype=np.float64)

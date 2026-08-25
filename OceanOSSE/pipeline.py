@@ -256,7 +256,9 @@ def run_pipeline(args: dict) -> None:
     logger.info("Completed: Loaded ocean model input dataset.")
 
     # Merge ocean model domain & variable datasets:
-    ds_mdl = xr.merge([ds_mdl, ds_domain])
+    ds_mdl = xr.merge([ds_mdl, ds_domain], compat='no_conflicts')
+    # Assign month coordinate:
+    ds_mdl = ds_mdl.assign_coords(month=ds_mdl['time'].dt.month)
 
     if config["climatology"].get("read_climatology", False):
         # Calculate monthly climatology from model dataset:
@@ -279,6 +281,13 @@ def run_pipeline(args: dict) -> None:
         )
         ds_clim = clim_loader.load_data()
         logger.info("Completed: Loaded monthly climatology from file.")
+
+    # Broadcast monthly climatology to ocean model timeseries:
+    ds_clim = ds_clim.sel(month=ds_mdl["month"])
+    # Add climatology & anomaly variables to ocean model dataset:
+    for var in config["inputs"]["variables"].keys():
+        ds_mdl[f"{var}_climatology"] = ds_clim[var]
+        ds_mdl[f"{var}_anom"] = ds_mdl[var] - ds_clim[var]
 
     # === Sampling === #
     logger.info("==== Sampling ====")

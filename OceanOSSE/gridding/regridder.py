@@ -32,27 +32,21 @@ class Regridder(abc.ABC):
     ----------
     variables : list of str or None, optional
         List of variable names to regrid.
-    mask : str or None, optional
-        Name of the model land-sea mask.
     """
 
     def __init__(
         self,
         variables: list[str] | None = None,
-        mask: str | None = None,
     ) -> None:
         # -- Validate Inputs -- #
         if variables is not None and not isinstance(variables, list):
             raise TypeError("``variables`` must be a list of strings or None.")
-        if mask is not None and not isinstance(mask, str):
-            raise TypeError("``mask`` must be a string or None.")
 
         # -- Attributes -- #
         self._variables = variables
-        self._mask = mask
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}(variables={self._variables}, mask={self._mask})"
+        return f"{type(self).__name__}(variables={self._variables})"
 
     @classmethod
     @abc.abstractmethod
@@ -171,11 +165,10 @@ class SwapRegridder(Regridder):
     def __init__(
         self,
         variables: list[str] | None = None,
-        mask: str | None = None,
         depth_max: int | float = 2000.0,
     ) -> None:
         # -- Initialise Regridder -- #
-        super().__init__(variables=variables, mask=mask)
+        super().__init__(variables=variables)
 
         # -- Validate Inputs -- #
         if not isinstance(depth_max, (int, float)):
@@ -212,19 +205,13 @@ class SwapRegridder(Regridder):
             )
         variables = source.keys()
 
-        mask = config["regridding"].get("mask_name", None)
-        if mask is None:
-            raise ValueError(
-                "Missing `mask_name` entry in [regridding] table of config .toml file."
-            )
-
         depth_max = config["regridding"].get("depth_max", None)
         if depth_max is None:
             raise ValueError(
                 "Missing `depth_max` entry in [regridding] table of config .toml file."
             )
 
-        return cls(variables=variables, mask=mask, depth_max=depth_max)
+        return cls(variables=variables, depth_max=depth_max)
 
     
     def regrid(
@@ -260,7 +247,7 @@ class SwapRegridder(Regridder):
         mask_depth = ds_mdl['depth'] <= self._depth_max
 
         # Define sampling mask using 2-dimensional profile mask, depth mask, and land-sea mask:
-        mask = (mask_2d & mask_depth & ds_mdl[self._mask]).transpose("time", "lev", "j", "i")
+        mask = (mask_2d & mask_depth & ds_mdl["mask"]).transpose("time", "lev", "j", "i")
 
         # Define output Dataset:
         ds_out = xr.Dataset()
@@ -288,12 +275,11 @@ class IDWRegridder(Regridder):
     def __init__(
         self,
         variables: list[str] | None = None,
-        mask: str | None = None,
         depth_max: int | float = 2000.0,
         interp_kwargs: dict | None = None,
     ) -> None:
         # -- Initialise Regridder -- #
-        super().__init__(variables=variables, mask=mask)
+        super().__init__(variables=variables)
 
         # -- Validate Inputs -- #
         if not isinstance(depth_max, (int, float)):
@@ -334,12 +320,6 @@ class IDWRegridder(Regridder):
             )
         variables = list(source.keys())
 
-        mask = config["regridding"].get("mask_name", None)
-        if mask is None:
-            raise ValueError(
-                "Missing `mask_name` entry in [regridding] table of config .toml file."
-            )
-
         depth_max = config["regridding"].get("depth_max", None)
         if depth_max is None:
             raise ValueError(
@@ -348,7 +328,7 @@ class IDWRegridder(Regridder):
 
         interp_kwargs = config["regridding"].get("interp_kwargs", None)
 
-        return cls(variables=variables, mask=mask, depth_max=depth_max, interp_kwargs=interp_kwargs)
+        return cls(variables=variables, depth_max=depth_max, interp_kwargs=interp_kwargs)
 
     
     def regrid(
@@ -379,7 +359,7 @@ class IDWRegridder(Regridder):
 
         if self._interp_kwargs is None:
             self._interp_kwargs = {"k": None,
-                                   "radius": 5,
+                                   "radius": 2.5,
                                    "num_threads": 0,
                                    "boundary_check": "none"
                                    }
@@ -411,7 +391,7 @@ class IDWRegridder(Regridder):
         # Iterate over each variable to regrid:
         for var in self._variables:
             logger.info(f"In Progress: Regridding variable `{var}` using pyinterp.inverse_distance_weighting.")
-            ds_out[f"{var}_regrid"] = xr.full_like(ds_mdl[var], fill_value=np.nan)
+            ds_out[f"{var}_anom_regrid"] = xr.full_like(ds_mdl[var], fill_value=np.nan)
 
             # Iterate over unique time-steps:
             for n in tqdm(range(len(times)),
@@ -442,7 +422,7 @@ class IDWRegridder(Regridder):
                         **self._interp_kwargs
                     )
 
-                    ds_out[f"{var}_regrid"].data[n, k, :, :] = idw.reshape(grid_shape)
+                    ds_out[f"{var}_anom_regrid"].data[n, k, :, :] = idw.reshape(grid_shape)
 
         logger.info(f"Completed: Regridded variable `{var}` using pyinterp.inverse_distance_weighting.")
 

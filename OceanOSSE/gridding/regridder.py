@@ -37,6 +37,7 @@ class Regridder(abc.ABC):
     def __init__(
         self,
         variables: list[str] | None = None,
+        kwargs: dict = None,
     ) -> None:
         # -- Validate Inputs -- #
         if variables is not None and not isinstance(variables, list):
@@ -44,9 +45,10 @@ class Regridder(abc.ABC):
 
         # -- Attributes -- #
         self._variables = variables
+        self._kwargs = kwargs or {}
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}(variables={self._variables})"
+        return f"{type(self).__name__}(variables={self._variables}, kwargs={self._kwargs})"
 
     @classmethod
     @abc.abstractmethod
@@ -106,7 +108,7 @@ class MockRegridder(Regridder):
     """
 
     @classmethod
-    def from_config(cls, config: dict) -> Self:
+    def from_config(cls) -> Self:
         """
         Instantiate a MockRegridder from the `[regridding]` table of
         the .toml configuration file.
@@ -157,23 +159,31 @@ class SwapRegridder(Regridder):
     ----------
     variables : list of str or None, optional
         List of variable names to regrid to ocean model grid.
-    depth_max : float, optional
-        Maximum depth to regrid synthetic observations onto the target grid.
-        Default is 2000 m.
+    kwargs : dict, optional
+        Additional keyword arguments for the SwapRegridder, including
+        maximum depth to regrid synthetic observations, `depth_max`.
     """
 
     def __init__(
         self,
         variables: list[str] | None = None,
-        depth_max: int | float = 2000.0,
+        kwargs: dict | None = None,
     ) -> None:
         # -- Initialise Regridder -- #
-        super().__init__(variables=variables)
+        super().__init__(variables=variables, kwargs=kwargs)
 
         # -- Validate Inputs -- #
-        if not isinstance(depth_max, (int, float)):
-            raise TypeError("``depth_max`` must be a float or int.")
-        self._depth_max = depth_max
+        if kwargs.get("depth_max", None) is None:
+            raise ValueError(
+                "Missing `depth_max` entry in [regridding] table of config .toml file."
+            )
+        if not isinstance(kwargs.get("depth_max"), (int, float)):
+            raise TypeError(
+                "Maximum depth `depth_max` must be a float or int."
+                )
+
+        # -- Assign depth_max from kwargs -- #
+        self._depth_max = kwargs["depth_max"]
 
 
     @classmethod
@@ -205,13 +215,13 @@ class SwapRegridder(Regridder):
             )
         variables = source.keys()
 
-        depth_max = config["regridding"].get("depth_max", None)
-        if depth_max is None:
-            raise ValueError(
-                "Missing `depth_max` entry in [regridding] table of config .toml file."
+        regridder_kwargs = config["regridding"].get("regridder_kwargs", None)
+        if regridder_kwargs is None:
+            logger.info(
+                "Missing `regridder_kwargs` entry in [regridding] table of config .toml file."
             )
 
-        return cls(variables=variables, depth_max=depth_max)
+        return cls(variables=variables, kwargs=regridder_kwargs)
 
     
     def regrid(
@@ -267,28 +277,34 @@ class IDWRegridder(Regridder):
     ----------
     variables : list of str or None, optional
         List of variable names to regrid to ocean model grid.
-    depth_max : float, optional
-        Maximum depth to regrid synthetic observations onto the target grid.
-        Default is 2000 m.
+    kwargs : dict, optional
+        Additional keyword arguments for the IDWRegridder, including
+        maximum depth to regrid synthetic observations, `depth_max`,
+        and pyinterp-specific interpolation kwargs, `interp_kwargs`.
     """
 
     def __init__(
         self,
         variables: list[str] | None = None,
-        depth_max: int | float = 2000.0,
-        interp_kwargs: dict | None = None,
+        kwargs: dict | None = None,
     ) -> None:
         # -- Initialise Regridder -- #
-        super().__init__(variables=variables)
+        super().__init__(variables=variables, kwargs=kwargs)
 
         # -- Validate Inputs -- #
-        if not isinstance(depth_max, (int, float)):
-            raise TypeError("``depth_max`` must be a float or int.")
-        self._depth_max = depth_max
+        if kwargs.get("depth_max", None) is None:
+            raise ValueError(
+                "Missing `depth_max` entry in [regridding] table of config .toml file."
+            )
+        if not isinstance(kwargs.get("depth_max"), (int, float)):
+            raise TypeError(
+                "Maximum depth `depth_max` must be a float or int."
+                )
+        self._depth_max = kwargs.get("depth_max")
 
-        if interp_kwargs is not None and not isinstance(interp_kwargs, dict):
+        if kwargs.get("interp_kwargs", None) is not None and not isinstance(kwargs.get("interp_kwargs"), dict):
             raise TypeError("``interp_kwargs`` must be a dictionary or None.")
-        self._interp_kwargs = interp_kwargs
+        self._interp_kwargs = kwargs.get("interp_kwargs")
 
 
     @classmethod
@@ -320,15 +336,13 @@ class IDWRegridder(Regridder):
             )
         variables = list(source.keys())
 
-        depth_max = config["regridding"].get("depth_max", None)
-        if depth_max is None:
-            raise ValueError(
-                "Missing `depth_max` entry in [regridding] table of config .toml file."
+        regridder_kwargs = config["regridding"].get("regridder_kwargs", None)
+        if regridder_kwargs is None:
+            logger.info(
+                "Missing `regridder_kwargs` entry in [regridding] table of config .toml file."
             )
 
-        interp_kwargs = config["regridding"].get("interp_kwargs", None)
-
-        return cls(variables=variables, depth_max=depth_max, interp_kwargs=interp_kwargs)
+        return cls(variables=variables, kwargs=regridder_kwargs)
 
     
     def regrid(

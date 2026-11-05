@@ -53,7 +53,9 @@ class DataLoader(abc.ABC):
         source: dict[str, dict],
         dimensions: dict[str, str],
         coordinates: dict[str, str],
-        table: str = "inputs"
+        table: str = "inputs",
+        mask: str | None = None,
+        thkcello: str | None = None,
     ):
         # -- Verify Inputs -- #
         if not isinstance(source, dict):
@@ -71,14 +73,40 @@ class DataLoader(abc.ABC):
         self._coordinates = coordinates
         self._table = table
 
+        # -- Verify domain variables -- #
+        if table == "domain":
+            if not isinstance(mask, str):
+                raise TypeError("``mask`` must be a specfied as a string.")
+            if mask not in source:
+                raise ValueError(f"missing required [domain.variables.{mask}] entry in the config file.")
+            self._mask = mask
+
+            if not isinstance(thkcello, str):
+                raise TypeError("``thkcello`` must be a specfied as a string.")
+            if thkcello not in source:
+                raise ValueError(f"missing required [domain.variables.{thkcello}] entry in the config file.")
+            self._thkcello = thkcello
+
     def __repr__(self) -> str:
-        return (
+        """
+        Return a string representation of the DataLoader instance.
+        """
+        repr_str = (
             f"{type(self).__name__}("
             f"source={self._source!r}, "
             f"dimensions={self._dimensions!r}, "
             f"coordinates={self._coordinates!r}, "
-            f"table={self._table!r})"
+            f"table={self._table!r}, "
         )
+
+        if self._table == "domain":
+            repr_str += (
+                f"mask={getattr(self, '_mask', None)!r}, "
+                f"thkcello={getattr(self, '_thkcello', None)!r}"
+            )
+        repr_str += ")"
+
+        return repr_str
 
     @classmethod
     @abc.abstractmethod
@@ -171,10 +199,20 @@ class DataLoader(abc.ABC):
         # -- Assign standard coordinate names and drop any non-standard coordinates -- #
         if self._coordinates is not None:
             ds = ds.assign_coords(
-                {coord: ds[var] for coord, var in self._coordinates.items()}
+                {coord: ds[var] for coord, var in self._coordinates.items() if var in ds}
             )
             drop_coords = [coord for coord in ds.coords if coord not in self._coordinates]
             ds = ds.drop_vars(drop_coords)
+
+        # -- Rename domain variables to standard variable names -- #
+        if self._table == "domain":
+            rename_vars = {}
+            if self._mask != "mask":
+                rename_vars[self._mask] = "mask"
+            if self._thkcello != "thkcello":
+                rename_vars[self._thkcello] = "thkcello"
+            if rename_vars:
+                ds = ds.rename(rename_vars)
 
         return ds
 
@@ -243,9 +281,18 @@ class NetCDFDataLoader(DataLoader):
         dimensions: dict[str, str],
         coordinates: dict[str, str],
         table: str = "inputs",
+        mask: str | None = None,
+        thkcello: str | None = None,
     ) -> None:
         # -- Initialise parent DataLoader class -- #
-        super().__init__(source, dimensions, coordinates, table)
+        super().__init__(
+            source=source,
+            dimensions=dimensions,
+            coordinates=coordinates,
+            table=table,
+            mask=mask,
+            thkcello=thkcello,
+            )
 
     @classmethod
     def from_config(cls, config: dict, table: str = "inputs") -> Self:
@@ -292,7 +339,17 @@ class NetCDFDataLoader(DataLoader):
                 f"Missing 'coordinates' entry in [{table}] table of config .toml file."
             )
 
-        return cls(source=source, dimensions=dimensions, coordinates=coordinates, table=table)
+        mask = config[table].get("mask", None)
+        thkcello = config[table].get("thkcello", None)
+
+        return cls(
+            source=source,
+            mask=mask,
+            thkcello=thkcello,
+            dimensions=dimensions,
+            coordinates=coordinates,
+            table=table
+        )
 
     def _open_dataset(
         self,

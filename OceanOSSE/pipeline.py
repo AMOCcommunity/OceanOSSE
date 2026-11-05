@@ -26,22 +26,22 @@ logger = logging.getLogger(__name__)
 
 # -- Registries -- #
 _DATA_LOADER_REGISTRY: dict[str, type[DataLoader]] = {
-    "netcdf": NetCDFDataLoader,
+    "NetCDF": NetCDFDataLoader,
 }
 
 _OBS_SAMPLER_REGISTRY: dict[str, type[ObsSampler]] = {
-    "test": MockObsSampler,
-    "nn": NNSampler,
-    "random": RandomSampler,
+    "Test": MockObsSampler,
+    "NearestNeighbor": NNSampler,
+    "Random": RandomSampler,
 }
 
 _REGRIDDER_REGISTRY: dict[str, type[Regridder]] = {
-    "test": MockRegridder,
-    "idw": IDWRegridder,
+    "Test": MockRegridder,
+    "InverseDistanceWeighted": IDWRegridder,
 }
 
 _DATA_WRITER_REGISTRY: dict[str, type[DataWriter]] = {
-    "netcdf": NetCDFDataWriter,
+    "NetCDF": NetCDFDataWriter,
 }
 
 
@@ -52,7 +52,7 @@ def _create_DataLoader(config: dict, table: str = "inputs") -> DataLoader:
 
     Options:
     - Built-in Registry:
-        - name: "netcdf" -> NetCDFDataLoader
+        - name: "NetCDF" -> NetCDFDataLoader
 
     - Plugins:
         - Custom DataLoader imported from `module` and `name` specified in config.
@@ -79,7 +79,7 @@ def _create_DataLoader(config: dict, table: str = "inputs") -> DataLoader:
     # 2. Registry DataLoader:
     else:
         # -- Use DataLoader class from registry -- #
-        format = config[table].get("format", "netcdf")
+        format = config[table].get("format", "NetCDF")
         try:
             data_loader = _DATA_LOADER_REGISTRY[format]
         except KeyError as e:
@@ -99,7 +99,7 @@ def _create_ObsSampler(config: dict) -> ObsSampler:
 
     Options:
     - Built-in Registry:
-        - name: "test" -> TestObsSampler
+        - name: "Test" -> TestObsSampler
 
     - Plugins:
         - Custom ObsSampler imported from `module` and `name` specified in config.
@@ -126,7 +126,7 @@ def _create_ObsSampler(config: dict) -> ObsSampler:
     # 2. Registry ObsSampler:
     else:
         # -- Use ObsSampler class from registry -- #
-        name = sampling.get("name", "test")
+        name = sampling.get("name", "Test")
         try:
             obs_sampler = _OBS_SAMPLER_REGISTRY[name]
         except KeyError as e:
@@ -146,7 +146,7 @@ def _create_Regridder(config: dict) -> Regridder:
 
     Options:
     - Built-in Registry:
-        - name: "test" -> TestRegridder
+        - name: "Test" -> TestRegridder
 
     - Plugins:
         - Custom Regridder imported from `module` and `name` specified in config.
@@ -173,7 +173,7 @@ def _create_Regridder(config: dict) -> Regridder:
     # 2. Registry Regridder:
     else:
         # -- Use Regridder class from registry -- #
-        name = regridding.get("name", "test")
+        name = regridding.get("name", "Test")
         try:
             regridder = _REGRIDDER_REGISTRY[name]
         except KeyError as e:
@@ -220,7 +220,7 @@ def _create_DataWriter(config: dict, climatology: bool = False) -> DataWriter:
     # 2. Registry DataWriter:
     else:
         # -- Use DataWriter class from registry -- #
-        format = outputs.get("format", "netcdf4")
+        format = outputs.get("format", "NetCDF")
         try:
             data_writer = _DATA_WRITER_REGISTRY[format]
         except KeyError as e:

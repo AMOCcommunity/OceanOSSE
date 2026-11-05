@@ -357,7 +357,7 @@ class NNSampler(ObsSampler):
                  error_kernels: list[ErrorKernel] | None = None,
                  start_date: str | None = None,
                  end_date: str | None = None,
-                 bbox: tuple | None = None
+                 bbox: list[float] | None = None
                  ):
         # -- Validate Inputs -- #
         if error_kernels is not None:
@@ -369,11 +369,11 @@ class NNSampler(ObsSampler):
                 if not isinstance(kernel, ErrorKernel):
                     raise TypeError(f"`error_kernels[{n}]` must be an ErrorKernel.")
         if start_date is not None and not isinstance(start_date, str):
-            raise TypeError("``start_date`` must be a str.")
+            raise TypeError("``start_date`` must be a string (YYYY-MM-DD) or None.")
         if end_date is not None and not isinstance(end_date, str):
-            raise TypeError("``end_date`` must be a str.")
-        if bbox is not None and not (isinstance(bbox, tuple) and len(bbox) == 4):
-            raise TypeError("``bbox`` must be a tuple of length 4.")
+            raise TypeError("``end_date`` must be a string (YYYY-MM-DD) or None.")
+        if bbox is not None and not (isinstance(bbox, list) and len(bbox) == 4):
+            raise TypeError("``bbox`` must be a list of length 4 (min_lon, min_lat, max_lon, max_lat).")
 
         # -- Initialise ObsSampler -- #
         super().__init__(error_kernels=error_kernels)
@@ -405,20 +405,25 @@ class NNSampler(ObsSampler):
         error_kernels = get_error_kernels(config=config)
 
         # -- Instantiate NNSampler from config dict -- #
-        start_date = config["sampling"].get("start_date", None)
+        sampler_kwargs = config["sampling"].get("sampler_kwargs", None)
+        if sampler_kwargs is None:
+            logger.info(
+                "Missing `sampler_kwargs` entry in [sampling] in config .toml file -> default is None."
+            )
+        start_date = sampler_kwargs.get("start_date", None)
         if start_date is None:
             logger.info(
-                "Missing `start_date` entry in [sampling] table of config .toml file -> default is None."
+                "Missing `start_date` entry in [sampling.sampler_kwargs] in config .toml file -> default is None."
             )
-        end_date = config["sampling"].get("end_date", None)
+        end_date = sampler_kwargs.get("end_date", None)
         if end_date is None:
             logger.info(
-                "Missing `end_date` entry in [sampling] table of config .toml file -> default is None."
+                "Missing `end_date` entry in [sampling.sampler_kwargs] in config .toml file -> default is None."
             )
-        bbox = config["sampling"].get("bbox", None)
+        bbox = sampler_kwargs.get("bbox", None)
         if bbox is None:
             logger.info(
-                "Missing `bbox` entry in [sampling] table of config .toml file -> default is None."
+                "Missing `bbox` entry in [sampling.sampler_kwargs] in config .toml file -> default is None."
             )
 
         return cls(error_kernels=error_kernels or None,
@@ -693,7 +698,7 @@ class RandomSampler(ObsSampler):
                  source: str = "argo",
                  start_date: str | None = None,
                  end_date: str | None = None,
-                 bbox: tuple | None = None
+                 bbox: list[float] | None = None
                  ):
         # -- Validate Inputs -- #
         if error_kernels is not None:
@@ -718,21 +723,21 @@ class RandomSampler(ObsSampler):
         self._source = source
 
         if start_date is not None and not isinstance(start_date, str):
-            raise TypeError("``start_date`` must be a str.")
+            raise TypeError("``start_date`` must be a string (YYYY-MM-DD) or None.")
         self._start_date = start_date
 
         if end_date is not None and not isinstance(end_date, str):
-            raise TypeError("``end_date`` must be a str.")
+            raise TypeError("``end_date`` must be a string (YYYY-MM-DD) or None.")
         self._end_date = end_date
 
-        if bbox is not None and not (isinstance(bbox, tuple) and len(bbox) == 4):
-            raise TypeError("``bbox`` must be a tuple of length 4.")
+        if bbox is not None and not (isinstance(bbox, list) and len(bbox) == 4):
+            raise TypeError("``bbox`` must be a list of length 4 (min_lon, min_lat, max_lon, max_lat) or None.")
         self._bbox = bbox
 
     @classmethod
     def from_config(cls, config: dict) -> Self:
         """
-        Parameterss
+        Parameters
         ----------
         config : dict
             Configuration dictionary containing input parameters from .toml
@@ -751,30 +756,36 @@ class RandomSampler(ObsSampler):
         error_kernels = get_error_kernels(config=config)
 
         # -- Instantiate RandomSampler from config dict -- #
-        n_samples = config["sampling"].get("n_samples", None)
+        sampler_kwargs = config["sampling"].get("sampler_kwargs", None)
+        if sampler_kwargs is None:
+            logger.info(
+                "Missing `sampler_kwargs` entry in [sampling] table of config .toml file."
+            )
+
+        n_samples = sampler_kwargs.get("n_samples", None)
         if n_samples is None:
             raise ValueError(
-                "Missing `n_samples` entry in [sampling] table of config .toml file."
+                "Missing `n_samples` entry in [sampling.sampler_kwargs] in config .toml file."
             )
-        source = config["sampling"].get("source", None)
+        source = sampler_kwargs.get("source", None)
         if source is None:
             raise ValueError(
-                "Missing `source` entry in [sampling] table of config .toml file. Options are: 'idealised' or 'argo'."
+                "Missing `source` entry in [sampling.sampler_kwargs] in config .toml file. Options are: 'idealised' or 'argo'."
             )
-        start_date = config["sampling"].get("start_date", None)
+        start_date = sampler_kwargs.get("start_date", None)
         if start_date is None:
             logger.info(
-                "Missing `start_date` entry in [sampling] table of config .toml file -> Using ."
+                "Missing `start_date` entry in [sampling.sampler_kwargs] in config .toml file -> default is None."
             )
-        end_date = config["sampling"].get("end_date", None)
+        end_date = sampler_kwargs.get("end_date", None)
         if end_date is None:
             logger.info(
-                "Missing `end_date` entry in [sampling] table of config .toml file -> default is None."
+                "Missing `end_date` entry in [sampling.sampler_kwargs] in config .toml file -> default is None."
             )
-        bbox = config["sampling"].get("bbox", None)
+        bbox = sampler_kwargs.get("bbox", None)
         if bbox is None:
             logger.info(
-                "Missing `bbox` entry in [sampling] table of config .toml file -> default is None."
+                "Missing `bbox` entry in [sampling.sampler_kwargs] in config .toml file -> default is None."
             )
 
         return cls(error_kernels=error_kernels or None,

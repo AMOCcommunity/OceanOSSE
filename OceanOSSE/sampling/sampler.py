@@ -49,7 +49,10 @@ def get_error_kernels(config: dict) -> list[ErrorKernel] | None:
     error_kernels_config = config["sampling"].get("error_kernels", None)
 
     if error_kernels_config is not None:
-        _ERROR_KERNEL_REGISTRY = {"test": MockErrorKernel}
+        _ERROR_KERNEL_REGISTRY = {
+            "Test": MockErrorKernel,
+            "InstrumentPrecision": InstrumentPrecisionErrorKernel
+            }
         kernels: list[ErrorKernel] = []
         for kernel_cfg in error_kernels_config:
             if ("module" in kernel_cfg) and ("name" in kernel_cfg):
@@ -87,9 +90,11 @@ class ErrorKernel(abc.ABC):
     Multiple kernels can be chained by an :class:`ObsSampler` and are applied
     sequentially in declaration order.
     """
+    def __init__(self, kwargs: dict | None = None):
+        self._kwargs = kwargs or {}
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}()"
+        return f"{type(self).__name__}(kwargs={self._kwargs})"
 
     @classmethod
     @abc.abstractmethod
@@ -166,6 +171,92 @@ class MockErrorKernel(ErrorKernel):
             "Applying MockErrorKernel -> returns synthetic observations dataset unchanged."
         )
         return ds
+
+
+class InstrumentPrecisionErrorKernel(ErrorKernel):
+    """
+    ErrorKernel used to emulate instrument precision errors.
+
+    Adds instrument precision errors to variables in synthetic
+    observations xarray.Dataset.
+    """
+    def __init__(self,
+                 precision: dict[str, float],
+                 seed: int | None = None,
+                 ):
+        # -- Validate Inputs -- #
+        if not isinstance(precision, dict):
+            raise TypeError("``precision`` must be a dictionary of variable names to float values.")
+        for var, val in precision.items():
+            if not isinstance(val, (float, int)):
+                raise TypeError(f"``precision`` for variable {var} must be a float.")
+        if seed is not None and not isinstance(seed, int):
+            raise TypeError("``seed`` must be an integer or None.")
+
+        # -- Initialise ErrorKernel -- #
+        super().__init__(kwargs={"precision": precision, "seed": seed})
+
+        # -- Initialise Attributes -- #
+        self._precision = precision
+        self._rng = np.random.default_rng(seed=seed)
+        if seed is None:
+            logger.info(f"Random seed not specified, using default entropy -> seed={self._rng.bit_generator.seed_seq.entropy}.")
+
+    @classmethod
+    def from_config(cls, config: dict) -> Self:
+        """
+        Instantiate an InstrumentPrecisionErrorKernel from the `[sampling]` table of
+        the .toml configuration file.
+        """
+        # -- Verify Input -- #
+        if not isinstance(config, dict):
+            raise TypeError("config must be a dictionary.")
+
+        # -- Instantiate InstrumentPrecisionErrorKernel from config dict -- #
+        kernel = [k for k in config["sampling"]["error_kernels"] if k["name"] == "InstrumentPrecision"]
+        if not kernel:
+            raise ValueError("InstrumentPrecisionErrorKernel not specified in [sampling.error_kernels] in config .toml file.")
+        if len(kernel) > 1:
+            logger.warning("Multiple InstrumentPrecisionErrorKernel entries in [sampling.error_kernels] in config .toml file -> using the first by default.")
+
+        precision = kernel[0].get("precision", None)
+        if precision is None:
+            raise ValueError("Missing `precision` entry for InstrumentPrecisionErrorKernel in config .toml file.")
+        seed = kernel[0].get("seed", None)
+
+        return cls(precision=precision, seed=seed)
+
+    def apply(self, ds: xr.Dataset) -> xr.Dataset:
+        """
+        Apply the InstrumentPrecisionErrorKernel to an xarray.Dataset of synthetic observations.
+
+        Parameters
+        ----------
+        ds : xarray.Dataset
+            Synthetic observations dataset produced by `ObsSampler.sample`.
+
+        Returns
+        -------
+        xarray.Dataset
+            Synthetic observations dataset with instrument precision errors applied.
+        """
+        ds_out = ds.copy()
+
+        # Apply errors in fixed order for reproducibility:
+        for var in sorted(self._precision):
+            var_anom = f"{var}_anom"
+            precision = self._precision[var]
+            if var_anom not in ds.data_vars:
+                raise KeyError(f"{var_anom!r} not included in synthetic observations: {list(ds.data_vars)}")
+            if precision <= 0:
+                raise ValueError(f"precision for {var_anom!r} must be greater than zero. {precision} specified")
+
+            # Generate random noise based on the specified precision and add to observations:
+            noise = self._rng.normal(0.0, precision, ds[var_anom].shape).astype(ds[var_anom].dtype, copy=False)
+            ds_out[var_anom].data = ds[var_anom] + noise
+            ds_out[var_anom].attrs["instrument_precision"] = precision
+
+        return ds_out
 
 
 # -- ObsSampler Abstract Base Class -- #
@@ -386,7 +477,7 @@ class NNSampler(ObsSampler):
     @classmethod
     def from_config(cls, config: dict) -> Self:
         """
-        Parameterss
+        Parameters
         ----------
         config : dict
             Configuration dictionary containing input parameters from .toml

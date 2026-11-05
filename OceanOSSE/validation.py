@@ -98,7 +98,9 @@ class DomainConfig(BaseModel):
         variables
     """
 
-    format: Literal["netcdf"] = "netcdf"
+    name: str | None = None
+    module: str | None = None
+    format: Literal["NetCDF"] = "NetCDF"
     mask: str = "mask"
     thkcello: str = "thkcello"
     dimensions: DimensionsConfig = Field(default_factory=DimensionsConfig)
@@ -133,7 +135,9 @@ class InputConfig(BaseModel):
         open_kwargs = { engine = "netcdf4" }
     """
 
-    format: Literal["netcdf"] = "netcdf"
+    name: str | None = None
+    module: str | None = None
+    format: Literal["NetCDF"] = "NetCDF"
     dimensions: DimensionsConfig = Field(default_factory=DimensionsConfig)
     coordinates: CoordinatesConfig = Field(default_factory=CoordinatesConfig)
     variables: dict[str, VariableConfig]
@@ -164,8 +168,10 @@ class ClimatologyConfig(BaseModel):
         variables
     """
 
-    read_climatology: bool
-    format: Literal["netcdf"] = "netcdf"
+    name: str | None = None
+    module: str | None = None
+    format: Literal["NetCDF"] = "NetCDF"
+    read_climatology: bool = False
     dimensions: DimensionsConfig = Field(default_factory=DimensionsConfig)
     coordinates: CoordinatesConfig = Field(default_factory=CoordinatesConfig)
     variables: dict[str, VariableConfig]
@@ -193,7 +199,7 @@ class SamplingConfig(BaseModel):
         error_kernels = [{...}, {...}]
     """
 
-    name: str = "test"
+    name: Literal["Test", "Random", "NearestNeighbor"] = "Test"
     module: str | None = None
     sampler_kwargs: dict[str, Any] = Field(default_factory=dict)
     error_kernels: list[dict[str, Any]] = Field(default_factory=list)
@@ -227,7 +233,7 @@ class RegriddingConfig(BaseModel):
         regridder_kwargs = { ... }
     """
 
-    name: str = "test"
+    name: Literal["Test", "InverseDistanceWeighted"] = "Test"
     module: str | None = None
     regridder_kwargs: dict[str, Any] = Field(default_factory=dict)
 
@@ -252,7 +258,7 @@ class RegriddingConfig(BaseModel):
 class OutputConfig(BaseModel):
     name: str | None = None
     module: str | None = None
-    format: Literal["netcdf"] = "netcdf"
+    format: Literal["NetCDF"] = "NetCDF"
     output_dir: str
     output_name: str
     date_format: Literal["Y", "M", "D"] = "Y"

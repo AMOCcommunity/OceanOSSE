@@ -8,7 +8,7 @@
 
 # ========================== Domain ==========================
 [domain]
-format = "netcdf"
+format = "NetCDF"
 mask = "tmask"
 thkcello = "e3t_0"
 
@@ -32,7 +32,7 @@ open_kwargs = { engine = "netcdf4" }
 
 # ========================== Inputs ==========================
 [inputs]
-format = "netcdf"
+format = "NetCDF"
 
 [inputs.dimensions]
 time = "time_counter"
@@ -56,7 +56,7 @@ open_kwargs = { engine = "netcdf4" }
 
 # ========================== Climatology ==========================
 [climatology]
-format = "netcdf"
+format = "NetCDF"
 read_climatology = false
 
 [climatology.dimensions]
@@ -81,7 +81,7 @@ open_kwargs = { engine = "netcdf4" }
 
 # ========================== Sampling ==========================
 [sampling]
-name = "random"
+name = "Random"
 
 [sampling.sampler_kwargs]
 n_samples = 10000
@@ -91,19 +91,20 @@ end_date = "2026-12-31"
 bbox = [-180, -90, 180, 90]
 
 [[sampling.error_kernels]]
-name = "test"
-kwargs = { sigma = 1.0 }
+name = "InstrumentPrecision"
+precision = { "thetao_con" = 0.002, "so_abs" = 0.01 }
+seed = 42
 
 # ========================== Regridding ==========================
 [regridding]
-name = "idw"
+name = "InverseDistanceWeighted"
 
 [regridding.regridder_kwargs]
 depth_max = 2000.0
 
 # ========================== Outputs ==========================
 [outputs]
-format = "netcdf"
+format = "NetCDF"
 output_dir = "/dssgfs01/working/otooth/Software/OceanOSSE/OceanOSSE"
 output_name = "OceanOSSE_TEST"
 date_format = "M"

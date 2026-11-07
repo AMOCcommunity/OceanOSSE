@@ -95,6 +95,11 @@ name = "InstrumentPrecision"
 precision = { "thetao_con" = 0.002, "so_abs" = 0.01 }
 seed = 42
 
+[[sampling.error_kernels]]
+name = "InstrumentCalibration"
+bias = { "thetao_con" = 0.002, "so_abs" = 0.0035 }
+seed = 43
+
 # ========================== Regridding ==========================
 [regridding]
 name = "InverseDistanceWeighted"

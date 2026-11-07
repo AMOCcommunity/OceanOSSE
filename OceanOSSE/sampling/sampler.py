@@ -51,7 +51,8 @@ def get_error_kernels(config: dict) -> list[ErrorKernel] | None:
     if error_kernels_config is not None:
         _ERROR_KERNEL_REGISTRY = {
             "Test": MockErrorKernel,
-            "InstrumentPrecision": InstrumentPrecisionErrorKernel
+            "InstrumentPrecision": InstrumentPrecisionErrorKernel,
+            "InstrumentCalibration": InstrumentCalibrationErrorKernel
             }
         kernels: list[ErrorKernel] = []
         for kernel_cfg in error_kernels_config:
@@ -177,7 +178,7 @@ class InstrumentPrecisionErrorKernel(ErrorKernel):
     """
     ErrorKernel used to emulate instrument precision errors.
 
-    Adds instrument precision errors to variables in synthetic
+    Add instrument precision errors to variables in synthetic
     observations xarray.Dataset.
     """
     def __init__(self,
@@ -245,16 +246,112 @@ class InstrumentPrecisionErrorKernel(ErrorKernel):
         # Apply errors in fixed order for reproducibility:
         for var in sorted(self._precision):
             var_anom = f"{var}_anom"
-            precision = self._precision[var]
+            precision_std = self._precision[var]
             if var_anom not in ds.data_vars:
                 raise KeyError(f"{var_anom!r} not included in synthetic observations: {list(ds.data_vars)}")
-            if precision <= 0:
-                raise ValueError(f"precision for {var_anom!r} must be greater than zero. {precision} specified")
+            if precision_std <= 0:
+                raise ValueError(f"precision std. for {var_anom!r} must be greater than zero. {precision_std} specified")
 
             # Generate random noise based on the specified precision and add to observations:
-            noise = self._rng.normal(0.0, precision, ds[var_anom].shape).astype(ds[var_anom].dtype, copy=False)
-            ds_out[var_anom].data = ds[var_anom] + noise
-            ds_out[var_anom].attrs["instrument_precision"] = precision
+            precision = self._rng.normal(
+                loc=0.0,
+                scale=precision_std,
+                size=ds[var_anom].shape
+                ).astype(ds[var_anom].dtype, copy=False)
+            ds_out[var_anom].data = ds[var_anom] + precision
+            ds_out[var_anom].attrs["instrument_precision_std"] = precision_std
+
+        return ds_out
+
+
+class InstrumentCalibrationErrorKernel(ErrorKernel):
+    """
+    ErrorKernel used to emulate instrument calibration errors.
+
+    Add instrument calibration bias (offset) to synthetic
+    observation profiles xarray.Dataset.
+    """
+    def __init__(self,
+                 bias: dict[str, float],
+                 seed: int | None = None,
+                 ):
+        # -- Validate Inputs -- #
+        if not isinstance(bias, dict):
+            raise TypeError("``bias`` must be a dictionary of variable names to float values.")
+        for var, val in bias.items():
+            if not isinstance(val, (float, int)):
+                raise TypeError(f"``bias`` for variable {var} must be a float.")
+        if seed is not None and not isinstance(seed, int):
+            raise TypeError("``seed`` must be an integer or None.")
+
+        # -- Initialise ErrorKernel -- #
+        super().__init__(kwargs={"bias": bias, "seed": seed})
+
+        # -- Initialise Attributes -- #
+        self._bias = bias
+        self._rng = np.random.default_rng(seed=seed)
+        if seed is None:
+            logger.info(f"Random seed not specified, using default entropy -> seed={self._rng.bit_generator.seed_seq.entropy}.")
+
+    @classmethod
+    def from_config(cls, config: dict) -> Self:
+        """
+        Instantiate an InstrumentCalibrationErrorKernel from the `[sampling]` table of
+        the .toml configuration file.
+        """
+        # -- Verify Input -- #
+        if not isinstance(config, dict):
+            raise TypeError("config must be a dictionary.")
+
+        # -- Instantiate InstrumentCalibrationErrorKernel from config dict -- #
+        kernel = [k for k in config["sampling"]["error_kernels"] if k["name"] == "InstrumentCalibration"]
+        if not kernel:
+            raise ValueError("InstrumentCalibrationErrorKernel not specified in [sampling.error_kernels] in config .toml file.")
+        if len(kernel) > 1:
+            logger.warning("Multiple InstrumentCalibrationErrorKernel entries in [sampling.error_kernels] in config .toml file -> using the first by default.")
+
+        bias = kernel[0].get("bias", None)
+        if bias is None:
+            raise ValueError("Missing `bias` entry for InstrumentCalibrationErrorKernel in config .toml file.")
+        seed = kernel[0].get("seed", None)
+
+        return cls(bias=bias, seed=seed)
+
+    def apply(self, ds: xr.Dataset) -> xr.Dataset:
+        """
+        Apply the InstrumentCalibrationErrorKernel to an xarray.Dataset of synthetic observations.
+
+        Parameters
+        ----------
+        ds : xarray.Dataset
+            Synthetic observations dataset produced by `ObsSampler.sample`.
+
+        Returns
+        -------
+        xarray.Dataset
+            Synthetic observations dataset with instrument calibration errors applied.
+        """
+        ds_out = ds.copy()
+
+        # Apply errors in fixed order for reproducibility:
+        for var in sorted(self._bias):
+            var_anom = f"{var}_anom"
+            bias_std = self._bias[var]
+            if var_anom not in ds.data_vars:
+                raise KeyError(f"{var_anom!r} not included in synthetic observations: {list(ds.data_vars)}")
+            if bias_std <= 0:
+                raise ValueError(f"calibration bias std. for {var_anom!r} must be greater than zero. {bias_std} specified")
+
+            # Generate random noise based on specified calibration bias and add to observations:
+            profile_id = ds["profile_id"]
+            bias = xr.full_like(profile_id, fill_value=0)
+            bias.data = self._rng.uniform(
+                low=-bias_std,
+                high=bias_std,
+                size=profile_id.size
+                ).astype(ds[var_anom].dtype, copy=False)
+            ds_out[var_anom].data = ds[var_anom] + bias
+            ds_out[var_anom].attrs["instrument_calibration_bias_std"] = bias_std
 
         return ds_out
 

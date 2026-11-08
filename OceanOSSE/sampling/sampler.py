@@ -253,13 +253,17 @@ class InstrumentPrecisionErrorKernel(ErrorKernel):
                 raise ValueError(f"precision std. for {var_anom!r} must be greater than zero. {precision_std} specified")
 
             # Generate random noise based on the specified precision and add to observations:
-            precision = self._rng.normal(
+            precision = xr.full_like(ds[var_anom], fill_value=0, dtype=ds[var_anom].dtype)
+            precision.data = self._rng.normal(
                 loc=0.0,
                 scale=precision_std,
                 size=ds[var_anom].shape
                 ).astype(ds[var_anom].dtype, copy=False)
             ds_out[var_anom].data = ds[var_anom] + precision
             ds_out[var_anom].attrs["instrument_precision_std"] = precision_std
+            # Store the instrument precision noise for this variable:
+            ds_out[f"{var}_precision"] = precision
+            ds_out[f"{var}_precision"].attrs["instrument_precision_std"] = precision_std
 
         return ds_out
 
@@ -344,14 +348,16 @@ class InstrumentCalibrationErrorKernel(ErrorKernel):
 
             # Generate random noise based on specified calibration bias and add to observations:
             profile_id = ds["profile_id"]
-            bias = xr.full_like(profile_id, fill_value=0)
+            bias = xr.full_like(profile_id, fill_value=0, dtype=ds[var_anom].dtype)
             bias.data = self._rng.uniform(
                 low=-bias_std,
                 high=bias_std,
                 size=profile_id.size
                 ).astype(ds[var_anom].dtype, copy=False)
             ds_out[var_anom].data = ds[var_anom] + bias
-            ds_out[var_anom].attrs["instrument_calibration_bias_std"] = bias_std
+            # Store the calibration bias for this variable:
+            ds_out[f"{var}_bias"] = bias
+            ds_out[f"{var}_bias"].attrs["instrument_calibration_bias_std"] = bias_std
 
         return ds_out
 

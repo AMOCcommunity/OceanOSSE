@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 class DataWriter(abc.ABC):
     """
     Abstract base class for writing a processed xarray.Dataset to persistent
-    storage (netCDF, Zarr, etc.).
+    storage (NetCDF, Zarr, etc.).
 
     Parameters
     ----------
@@ -36,6 +36,8 @@ class DataWriter(abc.ABC):
         Directory in which to write the output file.
     output_name : str
         Name of the output file (without extension).
+    output_type : str
+        Type of output dataset. Options are 'climatology', 'samples' or 'analysis'.
     date_format : str
         Date format for time dimension in output filename.
         Options are 'Y' (YYYY), 'M' (YYYY-MM) or 'D' (YYYY-MM-DD).
@@ -61,6 +63,8 @@ class DataWriter(abc.ABC):
         Name of the output file (without extension).
     _output_dir : str
         Directory in which to write the output file.
+    _output_type : str
+        Type of output dataset. Options are 'climatology', 'samples' or 'analysis'.
     _writer_kwargs : dict[str, any] or None
         Additional keyword arguments to pass to the underlying writing function, or None if no additional keyword arguments are applied.
     """
@@ -71,10 +75,10 @@ class DataWriter(abc.ABC):
         coordinates: dict[str, str],
         output_dir: str,
         output_name: str,
+        output_type: str,
         date_format: str,
         chunks: dict[str, int] | None = None,
         writer_kwargs: dict[str, any] | None = None,
-        climatology: bool = False,
     ) -> None:
         # -- Validate Input -- #
         if not isinstance(dimensions, dict):
@@ -85,39 +89,67 @@ class DataWriter(abc.ABC):
             raise TypeError("``output_dir`` must be a string.")
         if not isinstance(output_name, str):
             raise TypeError("``output_name`` must be a string.")
+        if not isinstance(output_type, str):
+            raise TypeError("``output_type`` must be a string.")
         if not isinstance(date_format, str):
             raise TypeError("``date_format`` must be a string.")
         if (chunks is not None) and not isinstance(chunks, dict):
             raise TypeError("``chunks`` must be a dict or None.")
         if (writer_kwargs is not None) and not isinstance(writer_kwargs, dict):
             raise TypeError("``writer_kwargs`` must be a dict or None.")
-        if not isinstance(climatology, bool):
-            raise TypeError("``climatology`` must be a boolean.")
 
         # -- Class Attributes -- #
         self._dimensions = dimensions
         self._coordinates = coordinates
         self._output_dir = output_dir
         self._output_name = output_name
+        self._output_type = output_type
         self._date_format = date_format
-        self._chunks = chunks
-        self._writer_kwargs = writer_kwargs
-        self._climatology = climatology
+
+        if output_type == "analysis":
+            if chunks is not None:
+                self._chunks = chunks.copy()
+        elif output_type == "climatology":
+            self._chunks = {"month": 1}
+        else:
+            self._chunks = {"profile_id": -1, "lev": -1}
+
+        if writer_kwargs is None:
+            if output_type == "analysis":
+                unlimited_dim = dimensions.get("time")
+            elif output_type == "climatology":
+                unlimited_dim = None
+            else:
+                unlimited_dim = "profile_id"
+
+            # Default writer_kwargs for netCDF output:
+            self._writer_kwargs = {
+                "unlimited_dims": unlimited_dim,
+                "mode": "w",
+            }
+        else:
+            # Override unlimited_dims for climatology and samples outputs:
+            self._writer_kwargs = writer_kwargs.copy()
+            if output_type == "climatology":
+                self._writer_kwargs["unlimited_dims"] = dimensions.get("month")
+            elif output_type == "samples":
+                self._writer_kwargs["unlimited_dims"] = "profile_id"
 
     def __repr__(self) -> str:
         return (
             f"{type(self).__name__}("
             f"output_dir={self._output_dir!r}, "
             f"output_name={self._output_name!r}, "
+            f"output_type={self._output_type!r}, "
             f"date_format={self._date_format!r}, "
             f"chunks={self._chunks!r}, "
             f"writer_kwargs={self._writer_kwargs!r}, "
-            f"climatology={self._climatology!r})"
+            f"output_type={self._output_type!r})"
         )
 
     @classmethod
     @abc.abstractmethod
-    def from_config(cls, config: dict, climatology: bool = False) -> Self:
+    def from_config(cls, config: dict, output_type: str) -> Self:
         """
         Abstract class method to instantiate a DataWriter from the `[outputs]` table
         of the .toml configuration file.
@@ -130,8 +162,8 @@ class DataWriter(abc.ABC):
         config : dict
             Configuration dictionary containing input parameters from .toml
             configuration file.
-        climatology : bool, optional
-            Whether the dataset is a climatology. Default is False.
+        output_type : str
+            Type of output dataset. Options are 'climatology', 'samples' or 'analysis'.
 
         Returns
         -------
@@ -189,7 +221,7 @@ class DataWriter(abc.ABC):
         output_name: str,
         file_format: str,
         date_format: str,
-        climatology: bool = False,
+        output_type: str,
     ) -> str:
         """
         Define resolved filepath to OceanOSSE output file(s).
@@ -207,9 +239,8 @@ class DataWriter(abc.ABC):
         date_format : str
             Date format for datetime limits in output filename.
             Options are 'Y' (YYYY), 'M' (YYYY-MM) or 'D' (YYYY-MM-DD).
-        climatology : bool, optional
-            If True, the output filename will include the 'climatology'
-            time bounds. Default is False.
+        output_type : str
+            Type of output dataset. Options are 'climatology', 'samples' or 'analysis'.
         """
         # -- Validate Inputs -- #
         if not isinstance(ds, xr.Dataset):
@@ -220,13 +251,15 @@ class DataWriter(abc.ABC):
             raise TypeError("output_name must be a string.")
         if file_format not in ["netcdf", "zarr"]:
             raise ValueError("file_format must be either 'netcdf' or 'zarr'.")
-        if not isinstance(climatology, bool):
-            raise ValueError("climatology must be a boolean.")
+        if not isinstance(output_type, str):
+            raise TypeError("output_type must be a string.")
+        if output_type not in ["climatology", "samples", "analysis"]:
+            raise ValueError("output_type must be 'climatology', 'samples' or 'analysis'.")
 
         # -- Create Date String for Output Fileapath -- #
         # Define time-limits of output dataset:
-        if climatology:
-            date_str = f"{np.datetime_as_string(ds['time_bnds'][0, 0], unit='M')}_{np.datetime_as_string(ds['time_bnds'][-1, -1], unit='M')}_climatology"
+        if output_type == "climatology":
+            date_str = f"{np.datetime_as_string(ds['time_bnds'][0, 0], unit='M')}_{np.datetime_as_string(ds['time_bnds'][-1, -1], unit='M')}"
         else:
             time_limits = ds["time"].values[[0, -1]]
 
@@ -252,6 +285,9 @@ class DataWriter(abc.ABC):
                     f"Invalid type ({type(time_limits[0])}) for dates. Expected cftime.datetime or np.datetime64."
                 )
 
+        # Append output type to date string:
+        date_str = f"{date_str}_{output_type}"
+
         # -- Define Output Filepath -- #
         if file_format == "netcdf":
             output_filename = f"{output_dir}/{output_name}_{date_str}.nc"
@@ -264,7 +300,7 @@ class DataWriter(abc.ABC):
 # -- DataWriter Implementations -- #
 class NetCDFDataWriter(DataWriter):
     """
-    DataWriter that serialises an xarray.Dataset to a netCDF file on disk.
+    DataWriter that serialises an xarray.Dataset to a NetCDF file on disk.
 
     Parameters
     ----------
@@ -276,6 +312,8 @@ class NetCDFDataWriter(DataWriter):
         Directory in which to write the output file.
     output_name : str
         Base filename (without ``.nc`` extension).
+    output_type : str
+        Type of output dataset. Options are 'climatology', 'samples' or 'analysis'.
     date_format : str
         Date format for time dimension in output filename.
         Options are 'Y' (YYYY), 'M' (YYYY-MM) or 'D' (YYYY-MM-DD).
@@ -284,8 +322,6 @@ class NetCDFDataWriter(DataWriter):
         Default is None, meaning no chunking is applied.
     writer_kwargs : dict[str, any], optional
         Additional keyword arguments to pass to xarray.Dataset.to_netcdf.
-    climatology : bool, optional
-        Whether the dataset is a climatology. Default is False.
     """
 
     def __init__(
@@ -294,10 +330,10 @@ class NetCDFDataWriter(DataWriter):
         coordinates: dict[str, str],
         output_dir: str,
         output_name: str,
+        output_type: str,
         date_format: str,
         chunks: dict[str, int] | None = None,
         writer_kwargs: dict[str, any] | None = None,
-        climatology: bool = False,
     ) -> None:
         # -- Initialise parent DataWriter class -- #
         super().__init__(
@@ -305,14 +341,14 @@ class NetCDFDataWriter(DataWriter):
             coordinates=coordinates,
             output_dir=output_dir,
             output_name=output_name,
+            output_type=output_type,
             date_format=date_format,
             chunks=chunks,
             writer_kwargs=writer_kwargs,
-            climatology=climatology
         )
 
     @classmethod
-    def from_config(cls, config: dict, climatology: bool = False) -> Self:
+    def from_config(cls, config: dict, output_type: str) -> Self:
         """
         Instantiate a NetCDFDataWriter from the `[outputs]` table of the .toml configuration file.
 
@@ -320,8 +356,8 @@ class NetCDFDataWriter(DataWriter):
         ----------
         config : dict
             Configuration dictionary.
-        climatology : bool, optional
-            Whether the dataset is a climatology. Default is False.
+        output_type : str
+            Type of output dataset. Options are 'climatology', 'samples' or 'analysis'.
         """
         # -- Verify Input -- #
         if not isinstance(config, dict):
@@ -338,12 +374,12 @@ class NetCDFDataWriter(DataWriter):
             date_format=outputs["date_format"],
             chunks=outputs.get("chunks", None),
             writer_kwargs=outputs.get("writer_kwargs", None),
-            climatology=climatology
+            output_type=output_type
         )
 
     def write_data(self, ds: xr.Dataset) -> str:
         """
-        Write OceanOSSE output xarray.Dataset to a netCDF file.
+        Write OceanOSSE output xarray.Dataset to a NetCDF file.
 
         Parameters
         ----------
@@ -367,43 +403,25 @@ class NetCDFDataWriter(DataWriter):
             ds=ds,
             output_dir=self._output_dir,
             output_name=self._output_name,
+            output_type=self._output_type,
             file_format="netcdf",
             date_format=self._date_format,
-            climatology=self._climatology
         )
 
         # -- Reconstruct Dataset with Original Dimension and Coordinate Names -- #
-        if not self._climatology:
+        if self._output_type == "analysis":
             ds = self._reconstruct_dataset(ds)
 
         # -- Apply Optional Chunking -- #
-        if self._climatology:
-            ds = ds.chunk({"month": 1})
-        else:
-            if self._chunks is not None:
-                ds = ds.chunk(self._chunks)
+        if self._chunks is not None:
+            ds = ds.chunk(self._chunks)
 
         # -- Write Dataset to NetCDF -- #
-        if self._writer_kwargs is None:
-            if not self._climatology:
-                unlimited_dim = self._dimensions.get("time")
-            else:
-                unlimited_dim = self._dimensions.get("month")
-
-            # Default writer_kwargs for netCDF output:
-            self._writer_kwargs = {
-                "unlimited_dims": unlimited_dim,
-                "mode": "w",
-            }
-        else:
-            if self._climatology:
-                self._writer_kwargs["unlimited_dims"] = self._dimensions.get("month")
-
         # Remove existing encoding:
         ds.encoding.clear()
         ds.to_netcdf(path=output_filepath, **self._writer_kwargs)
         logging.info(
-            f"--> Completed: Written output dataset to netCDF file: {output_filepath}"
+            f"--> Completed: Written output {self._output_type} dataset to NetCDF file: {output_filepath}"
         )
 
         return output_filepath

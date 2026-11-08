@@ -201,6 +201,7 @@ class SamplingConfig(BaseModel):
 
     name: Literal["Test", "Random", "NearestNeighbor"] = "Test"
     module: str | None = None
+    write_samples: bool = False
     sampler_kwargs: dict[str, Any] = Field(default_factory=dict)
     error_kernels: list[dict[str, Any]] = Field(default_factory=list)
 

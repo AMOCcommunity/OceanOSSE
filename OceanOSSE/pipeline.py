@@ -187,7 +187,7 @@ def _create_Regridder(config: dict) -> Regridder:
     return regridder.from_config(config=config)
 
 
-def _create_DataWriter(config: dict, climatology: bool = False) -> DataWriter:
+def _create_DataWriter(config: dict, output_type: str) -> DataWriter:
     """
     Instantiate a DataWriter from the `[outputs]` table of the .toml configuration file.
 
@@ -201,8 +201,8 @@ def _create_DataWriter(config: dict, climatology: bool = False) -> DataWriter:
     # -- Validate Inputs -- #
     if not isinstance(config, dict):
         raise TypeError("``config`` must be a dictionary.")
-    if not isinstance(climatology, bool):
-        raise TypeError("``climatology`` must be a boolean.")
+    if not isinstance(output_type, str):
+        raise TypeError("``output_type`` must be a string.")
 
     # -- Instantiate DataWriter -- #
     outputs = config["outputs"]
@@ -231,7 +231,7 @@ def _create_DataWriter(config: dict, climatology: bool = False) -> DataWriter:
             f"Completed: Created DataWriter from Registry -> {format}: {data_writer.__name__}"
         )
 
-    return data_writer.from_config(config=config, climatology=climatology)
+    return data_writer.from_config(config=config, output_type=output_type)
 
 
 # -- Define Pipeline Functions -- #
@@ -289,7 +289,7 @@ def run_pipeline(args: dict) -> None:
         )
         ds_clim = data_loader.compute_monthly_climatology()
         logger.info("Completed: Calculated monthly climatology from model input dataset.")
-        clim_writer = _create_DataWriter(config=config, climatology=True)
+        clim_writer = _create_DataWriter(config=config, output_type="climatology")
         logger.info(
             f"In Progress: Writing monthly climatology to file using DataWriter:\n {clim_writer}..."
         )
@@ -311,6 +311,14 @@ def run_pipeline(args: dict) -> None:
         f"In Progress: Sampling synthetic ocean observations using ObsSampler:\n {obs_sampler}..."
     )
     ds_obs = obs_sampler.sample(ds_mdl=ds_mdl)
+    # Write sampled observations to file using DataWriter:
+    if config["sampling"].get("write_samples", False):
+        samples_writer = _create_DataWriter(config=config, output_type="samples")
+        logger.info(
+            f"In Progress: Writing sampled observations to file using DataWriter:\n {samples_writer}..."
+        )
+        samples_output_filepath = samples_writer.write_data(ds=ds_obs)
+        logger.info(f"Completed: Written sampled observations to file: {samples_output_filepath}")
 
     # === Regridding === #
     logger.info("==== Regridding ====")
@@ -324,7 +332,7 @@ def run_pipeline(args: dict) -> None:
     # === Outputs === #
     logger.info("==== Outputs ====")
     # Write output dataset to file using DataWriter:
-    data_writer = _create_DataWriter(config=config)
+    data_writer = _create_DataWriter(config=config, output_type="analysis")
     logger.info(f"In Progress: Writing output dataset to file using DataWriter:\n {data_writer}...")
     output_filepath = data_writer.write_data(ds=ds_regridded)
     logger.info(f"Completed: Written output dataset to file: {output_filepath}")

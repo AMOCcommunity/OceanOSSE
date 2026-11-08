@@ -82,6 +82,7 @@ open_kwargs = { engine = "netcdf4" }
 # ========================== Sampling ==========================
 [sampling]
 name = "Random"
+write_samples = true
 
 [sampling.sampler_kwargs]
 n_samples = 10000

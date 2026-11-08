@@ -69,8 +69,8 @@ class DataLoader(abc.ABC):
 
         # -- Class Attributes -- #
         self._source = source
-        self._dimensions = dimensions
-        self._coordinates = coordinates
+        self._dimensions = dimensions.copy()
+        self._coordinates = coordinates.copy()
         self._table = table
 
         # -- Verify domain variables -- #
@@ -199,7 +199,7 @@ class DataLoader(abc.ABC):
         # -- Assign standard coordinate names and drop any non-standard coordinates -- #
         if self._coordinates is not None:
             ds = ds.assign_coords(
-                {coord: ds[var] for coord, var in self._coordinates.items() if var in ds}
+                {coord: ds[var] for coord, var in self._coordinates.items() if (var in ds) and (coord != var)}
             )
             drop_coords = [coord for coord in ds.coords if coord not in self._coordinates]
             ds = ds.drop_vars(drop_coords)

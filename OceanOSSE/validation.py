@@ -37,8 +37,52 @@ class VariableConfig(BaseModel):
         return v
 
 
-# -- [<section>.dimensions] -- #
-class DimensionsConfig(BaseModel):
+# -- [domain.dimensions] -- #
+class DomainDimensionsConfig(BaseModel):
+    """
+    Schema for `[domain.dimensions]`.
+
+    Example
+    -------
+    .. code-block:: toml
+
+        [domain.dimensions]
+        time = "time_counter"
+        lev  = "deptht"
+        j    = "y"
+        i    = "x"
+    """
+
+    time: str = "time"
+    lev: str = "lev"
+    j: str = "j"
+    i: str = "i"
+
+
+# -- [climatology.dimensions] -- #
+class ClimatologyDimensionsConfig(BaseModel):
+    """
+    Schema for `[climatology.dimensions]`.
+
+    Example
+    -------
+    .. code-block:: toml
+
+        [climatology.dimensions]
+        month = "month"
+        lev  = "deptht"
+        j    = "y"
+        i    = "x"
+    """
+
+    month: str = "month"
+    lev: str = "lev"
+    j: str = "j"
+    i: str = "i"
+
+
+# -- [inputs.dimensions] -- #
+class InputsDimensionsConfig(BaseModel):
     """
     Schema for `[inputs.dimensions]`.
 
@@ -59,8 +103,52 @@ class DimensionsConfig(BaseModel):
     i: str = "i"
 
 
-# -- [<section>.coordinates] -- #
-class CoordinatesConfig(BaseModel):
+# -- [domain.coordinates] -- #
+class DomainCoordinatesConfig(BaseModel):
+    """
+    Schema for `[domain.coordinates]`.
+
+    Example
+    -------
+    .. code-block:: toml
+
+        [domain.coordinates]
+        time = "time_counter"
+        depth  = "deptht"
+        lon    = "nav_lon"
+        lat    = "nav_lat"
+    """
+
+    time: str = "time"
+    depth: str = "depth"
+    lon: str = "lon"
+    lat: str = "lat"
+
+
+# -- [climatology.coordinates] -- #
+class ClimatologyCoordinatesConfig(BaseModel):
+    """
+    Schema for `[climatology.coordinates]`.
+
+    Example
+    -------
+    .. code-block:: toml
+
+        [climatology.coordinates]
+        month = "month"
+        depth  = "deptht"
+        lon    = "nav_lon"
+        lat    = "nav_lat"
+    """
+
+    month: str = "month"
+    depth: str = "depth"
+    lon: str = "lon"
+    lat: str = "lat"
+
+
+# -- [inputs.coordinates] -- #
+class InputsCoordinatesConfig(BaseModel):
     """
     Schema for `[inputs.coordinates]`.
 
@@ -69,7 +157,7 @@ class CoordinatesConfig(BaseModel):
     .. code-block:: toml
 
         [inputs.coordinates]
-        time   = "time_counter"
+        time = "time_counter"
         depth  = "deptht"
         lon    = "nav_lon"
         lat    = "nav_lat"
@@ -103,8 +191,8 @@ class DomainConfig(BaseModel):
     format: Literal["NetCDF"] = "NetCDF"
     mask: str = "mask"
     thkcello: str = "thkcello"
-    dimensions: DimensionsConfig = Field(default_factory=DimensionsConfig)
-    coordinates: CoordinatesConfig = Field(default_factory=CoordinatesConfig)
+    dimensions: DomainDimensionsConfig = Field(default_factory=DomainDimensionsConfig)
+    coordinates: DomainCoordinatesConfig = Field(default_factory=DomainCoordinatesConfig)
     variables: dict[str, VariableConfig]
 
     @field_validator("variables")
@@ -138,8 +226,8 @@ class InputConfig(BaseModel):
     name: str | None = None
     module: str | None = None
     format: Literal["NetCDF"] = "NetCDF"
-    dimensions: DimensionsConfig = Field(default_factory=DimensionsConfig)
-    coordinates: CoordinatesConfig = Field(default_factory=CoordinatesConfig)
+    dimensions: InputsDimensionsConfig = Field(default_factory=InputsDimensionsConfig)
+    coordinates: InputsCoordinatesConfig = Field(default_factory=InputsCoordinatesConfig)
     variables: dict[str, VariableConfig]
 
     @field_validator("variables")
@@ -172,8 +260,8 @@ class ClimatologyConfig(BaseModel):
     module: str | None = None
     format: Literal["NetCDF"] = "NetCDF"
     read_climatology: bool = False
-    dimensions: DimensionsConfig = Field(default_factory=DimensionsConfig)
-    coordinates: CoordinatesConfig = Field(default_factory=CoordinatesConfig)
+    dimensions: ClimatologyDimensionsConfig = Field(default_factory=ClimatologyDimensionsConfig)
+    coordinates: ClimatologyCoordinatesConfig = Field(default_factory=ClimatologyCoordinatesConfig)
     variables: dict[str, VariableConfig]
 
     @field_validator("variables")

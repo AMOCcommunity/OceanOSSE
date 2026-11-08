@@ -1008,27 +1008,52 @@ class RandomSampler(ObsSampler):
         xarray.Dataset
             Sampled synthetic observations dataset.
         """
-        # -- Create empty (i,j,t) indices for sampled profiles -- #
-        n_profiles = self._n_samples * ds_mdl['time'].size
+        # -- Determine analysis times [YYYY-MM] from input times -- #
+        t_monthly = xr.DataArray(np.unique(ds_mdl["time"].astype("datetime64[M]")), dims="time")
+        m_monthly = t_monthly.dt.month
+        analysis_freq = ds_mdl["time"].size == t_monthly.size
 
+        if not analysis_freq:
+            logger.info(
+                f"--> Number of input time-steps ({ds_mdl['time'].size}) exceeds monthly analysis time-steps ({t_monthly.size}). Input time-steps within each monthly analysis period will be sampled uniformly."
+                )
+
+        # -- Create empty (i,j,t) indices for sampled profiles -- #
+        n_profiles = self._n_samples * t_monthly.size
         prof_id = xr.DataArray(np.arange(n_profiles), dims="profile_id")
         i_index = xr.DataArray(np.zeros((n_profiles), dtype=int), dims="profile_id", coords={"profile_id": prof_id})
-        j_index = xr.DataArray(np.zeros((n_profiles), dtype=int), dims="profile_id", coords={"profile_id": prof_id})
-        time_index = xr.DataArray(np.zeros((n_profiles), dtype=int), dims="profile_id", coords={"profile_id": prof_id})
+        j_index = xr.zeros_like(i_index)
+        time_index = xr.zeros_like(i_index)
+        analysis_index = xr.zeros_like(i_index)
 
         # -- Collect random samples from the ocean model grid -- #
-        for t in range(ds_mdl['time'].size):
-            # Get sample indices for current time-step:
+        for t in range(t_monthly.size):
+            # Define sample profile indices for target analysis month:
             nst = t * self._n_samples
             nen = (t + 1) * self._n_samples
+
             if ds_prob is not None:
-                # Select probability distribution for current month:
-                prob = ds_prob["probability"].sel({"month": ds_mdl["month"].isel({"time": t})})
+                # Select probability distribution for analysis month:
+                prob = ds_prob["probability"].sel({"month": m_monthly.isel(time=t)})
             else:
                 # Use uniform probability distribution for idealised random sampling:
                 prob = None
-            # Add (i,j,t) indices for randomly sampled profiles:
-            time_index.data[nst:nen] = t
+
+            # Collect (time) indices for randomly sampled profiles:
+            if analysis_freq:
+                # Assign all profiles time + analysis index of target analysis month:
+                time_index.data[nst:nen] = t
+            else:
+                # Assign each profile random time index within the target month:
+                t_inds = np.arange(ds_mdl["time"].size)
+                t_mask = ds_mdl["time"].astype("datetime64[M]") == t_monthly.isel(time=t)
+                # Use uniform random sampling with replacement within the target month:
+                time_index.data[nst:nen] = np.random.choice(a=t_inds[t_mask], size=self._n_samples)
+
+            # Assign all profiles analysis index of target month:
+            analysis_index.data[nst:nen] = t
+
+            # Collect (i,j) indices for randomly sampled profiles:
             i_index.data[nst:nen], j_index.data[nst:nen] = self._collect_random_sample(ds_mdl=ds_mdl,
                                                                                        n_samples=self._n_samples,
                                                                                        probability=prob
@@ -1042,6 +1067,9 @@ class RandomSampler(ObsSampler):
                                          j_index=j_index,
                                          time_index=time_index
                                          )
+
+        # Add analysis time to synthetic observation dataset:
+        ds_synth["analysis_time"] = t_monthly.isel(time=analysis_index)
 
         logger.info("--> Completed: Extracted synthetic profiles from ocean model dataset.")
 

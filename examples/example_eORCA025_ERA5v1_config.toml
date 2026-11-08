@@ -1,0 +1,115 @@
+# ============================================================
+# OceanOSSE Example Configuration: NEMO eORCA025 ERA5v1
+# ============================================================
+# To run:
+#   OceanOSSE run examples/example_config.toml
+#   OceanOSSE run examples/example_config.toml --dry-run
+# ============================================================
+
+# ========================== Domain ========================== #
+[domain]
+format = "NetCDF"
+mask = "tmask"
+thkcello = "e3t_0"
+
+[domain.dimensions]
+lev  = "nav_lev"
+j    = "y"
+i    = "x"
+
+[domain.coordinates]
+depth = "nav_lev"
+lon = "nav_lon"
+lat = "nav_lat"
+
+[domain.variables.tmask]
+path = "/dssgfs01/scratch/npd/simulations/Domains/eORCA025/eORCA025_ERA5v1_domain_cfg_mesh_mask_util.nc"
+open_kwargs = { engine = "netcdf4" }
+
+[domain.variables.e3t_0]
+path = "/dssgfs01/scratch/npd/simulations/Domains/eORCA025/eORCA025_ERA5v1_domain_cfg_mesh_mask_util.nc"
+open_kwargs = { engine = "netcdf4" }
+
+# ========================== Inputs ========================== #
+[inputs]
+
+[inputs.dimensions]
+time = "time_counter"
+lev  = "deptht"
+j    = "y"
+i    = "x"
+
+[inputs.coordinates]
+time = "time_counter"
+depth = "deptht"
+lon = "nav_lon"
+lat = "nav_lat"
+
+[inputs.variables.thetao_con]
+path = "/dssgfs01/scratch/npd/simulations/eORCA025_ERA5_v1/eORCA025_ERA5_5d_grid_T_202001*.nc"
+open_kwargs = { engine = "netcdf4" }
+
+[inputs.variables.so_abs]
+path = "/dssgfs01/scratch/npd/simulations/eORCA025_ERA5_v1/eORCA025_ERA5_5d_grid_T_202001*.nc"
+open_kwargs = { engine = "netcdf4" }
+
+# ========================== Climatology ========================== #
+[climatology]
+read_climatology = true
+
+[climatology.dimensions]
+month = "month"
+lev = "lev"
+j = "j"
+i = "i"
+
+[climatology.coordinates]
+lat = "lat"
+lon = "lon"
+depth = "depth"
+month = "month"
+
+[climatology.variables.thetao_con]
+path = "/dssgfs01/working/otooth/Software/OceanOSSE/OceanOSSE/eORCA025_ERA5v1_2000-01_2026-12_climatology.nc"
+open_kwargs = { engine = "netcdf4", chunks = {} }
+
+[climatology.variables.so_abs]
+path = "/dssgfs01/working/otooth/Software/OceanOSSE/OceanOSSE/eORCA025_ERA5v1_2000-01_2026-12_climatology.nc"
+open_kwargs = { engine = "netcdf4", chunks = {} }
+
+# ========================== Sampling ========================== #
+[sampling]
+name = "Random"
+write_samples = true
+
+[sampling.sampler_kwargs]
+n_samples = 10000
+source = "argo"
+start_date = "2004-01-01"
+end_date = "2026-12-31"
+bbox = [-180, -90, 180, 90]
+
+[[sampling.error_kernels]]
+name = "InstrumentPrecision"
+precision = { "thetao_con" = 0.002, "so_abs" = 0.01 }
+seed = 42
+
+[[sampling.error_kernels]]
+name = "InstrumentCalibration"
+bias = { "thetao_con" = 0.002, "so_abs" = 0.0035 }
+seed = 43
+
+# ========================== Regridding ========================== #
+[regridding]
+name = "InverseDistanceWeighted"
+
+[regridding.regridder_kwargs]
+depth_max = 2000.0
+
+# ========================== Outputs ========================== #
+[outputs]
+output_dir = "/dssgfs01/working/otooth/Software/OceanOSSE/OceanOSSE"
+output_name = "eORCA025_ERA5v1"
+date_format = "M"
+chunks = { time_counter = 12 }
+writer_kwargs = { unlimited_dims = "time_counter", mode = "w" }

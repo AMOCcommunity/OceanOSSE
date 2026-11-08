@@ -210,6 +210,9 @@ def _extract_locations_ij(ds_mdl, i_index, j_index, time_index):
         Synthetic profile dataset.
     """
 
-    ds_model_profile = ds_mdl.isel(i=i_index, j=j_index, time=time_index)
+    ds_model_profile = (ds_mdl
+                        .isel(i=i_index, j=j_index, time=time_index)
+                        .transpose("profile_id", "lev")
+                        )
 
     return ds_model_profile

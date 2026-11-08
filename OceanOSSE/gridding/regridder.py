@@ -381,7 +381,7 @@ class IDWRegridder(Regridder):
         # -- Load Profile Data -- #
         prof_lons = ds_obs["lon"].values
         prof_lats = ds_obs["lat"].values
-        prof_times = ds_obs["time"].values
+        prof_times = ds_obs["analysis_time"].values
         prof_values = {var: ds_obs[f"{var}_anom"].values for var in self._variables}
 
         # -- Load Model Grid Data -- #
@@ -393,7 +393,7 @@ class IDWRegridder(Regridder):
         logger.info("Completed: Loaded synthetic profiles and model grid data.")
 
         # -- Inverse Distance Weighted (IDW) Interpolation -- #
-        # Identify unique profile times:
+        # Identify unique analysis times:
         times = np.unique(prof_times)
 
         # Determine maximum depth level to regrid:
